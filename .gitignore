@@ -1,0 +1,5 @@
+# Prywatne dane finansowe: nigdy nie trafiają do internetu razem z aplikacją
+prywatne/
+
+# Ustawienia narzędzi deweloperskich: niepotrzebne w opublikowanej aplikacji
+.claude/

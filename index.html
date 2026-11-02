@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Moje wydatki</title>
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Wydatki">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Zakładki na górze -->
+    <nav class="tabbar">
+      <div id="tabbar-switch" class="tabbar-switch">
+        <button id="nav-wydatki" type="button">Wydatki</button>
+        <button id="nav-wplywy" type="button">Wpływy</button>
+        <button id="nav-podsumowanie" type="button">Podsumowanie</button>
+        <button id="nav-wykresy" type="button">Wykresy</button>
+      </div>
+    </nav>
+
+    <main>
+      <!-- Zakładki Wydatki i Wpływy: ten sam ekran, inne dane i kolor -->
+      <section id="tab-transakcje" class="tab">
+        <form id="expense-form" class="entry" novalidate>
+          <!-- Tarcza otwiera kopię danych; kropka świeci, gdy kopia jest potrzebna -->
+          <button id="backup-open" type="button" class="backup-open" aria-label="Kopia danych" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.4-2.9 7.9-7 9.5-4.1-1.6-7-5.1-7-9.5V6l7-3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 12l2.2 2.2L15.2 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+
+          <div class="entry-top">
+            <button id="date-toggle" type="button" class="date-pill" aria-haspopup="dialog">
+              <span id="date-value"></span>
+            </button>
+          </div>
+
+          <div class="amount-line">
+            <!-- Ukryta kopia tekstu w .amount-sizer dopasowuje szerokość pola do wpisanej kwoty -->
+            <span id="amount-sizer" class="amount-sizer" data-value="0,00">
+              <input id="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0,00" aria-label="Kwota w PLN">
+            </span>
+            <span class="currency" aria-hidden="true">PLN</span>
+          </div>
+
+          <div class="entry-bottom">
+            <div id="category-select" class="category-select">
+              <button id="category-toggle" type="button" class="category-toggle" aria-expanded="false" aria-controls="category-panel">
+                <span id="category-value"></span>
+              </button>
+
+              <div id="category-panel" class="category-panel" hidden>
+                <div id="category-options" class="category-options"></div>
+                <button id="category-new" type="button" class="category-new"></button>
+              </div>
+            </div>
+
+            <!-- Opis pojawia się po wybraniu kategorii -->
+            <div id="note-block" class="note-block" hidden>
+              <input id="note" type="text" maxlength="40" autocomplete="off" autocapitalize="sentences" aria-label="Opis">
+              <div id="note-suggestions" class="note-suggestions"></div>
+            </div>
+
+            <button id="save-button" type="submit" class="btn-primary">Zapisz</button>
+            <p id="form-error" class="error" role="alert" hidden></p>
+            <p id="form-ok" class="ok" role="status" hidden></p>
+          </div>
+        </form>
+
+        <h2 id="recent-title"></h2>
+        <div id="recent-list"></div>
+      </section>
+
+      <!-- Zakładka Podsumowanie -->
+      <section id="tab-podsumowanie" class="tab" hidden>
+        <div class="period">
+          <div class="segmented" role="group" aria-label="Rodzaj okresu">
+            <button id="mode-month" type="button">Miesiąc</button>
+            <button id="mode-year" type="button">Rok</button>
+          </div>
+          <div class="period-selects">
+            <select id="select-month" aria-label="Miesiąc"></select>
+            <select id="select-year" aria-label="Rok"></select>
+          </div>
+        </div>
+
+        <div class="total">
+          <span id="total-label" class="total-label"></span>
+          <div class="total-value">
+            <strong id="total-amount"></strong>
+            <span class="currency">PLN</span>
+          </div>
+          <p id="balance-note" class="balance-note"></p>
+          <!-- Morski pasek to wpływy, plazmowa część to wydatki -->
+          <div id="balance-bar" class="balance-bar" aria-hidden="true"><span id="balance-fill"></span></div>
+        </div>
+
+        <!-- Kafelki pokazują sumy i przełączają listę poniżej -->
+        <div class="flow-cards" role="group" aria-label="Pokaż listę">
+          <button id="view-income" type="button" class="flow-card income">
+            <span class="flow-label">↓ Wpływy</span>
+            <strong id="income-total"></strong>
+            <span class="flow-currency">PLN</span>
+          </button>
+          <button id="view-expense" type="button" class="flow-card">
+            <span class="flow-label">↑ Wydatki</span>
+            <strong id="expense-total"></strong>
+            <span class="flow-currency">PLN</span>
+          </button>
+        </div>
+
+        <p id="filtered-note" class="filtered-note" hidden></p>
+        <div id="summary-list"></div>
+
+        <!-- Przycisk z boku, otwiera panel z kategoriami -->
+        <button id="filter-open" type="button" class="filter-button">Filtruj</button>
+      </section>
+
+      <!-- Zakładka Wykresy -->
+      <section id="tab-wykresy" class="tab" hidden>
+        <div class="chart-period">
+          <button id="charts-prev" type="button" class="calendar-arrow" aria-label="Poprzedni miesiąc">‹</button>
+          <span id="charts-title" class="calendar-title" aria-live="polite"></span>
+          <button id="charts-next" type="button" class="calendar-arrow" aria-label="Następny miesiąc">›</button>
+        </div>
+
+        <article class="card chart-card">
+          <h2 class="chart-question">Ile zarabiam, a ile wydaję?</h2>
+          <p id="flow-headline" class="chart-headline"></p>
+          <div id="flow-legend" class="chart-legend"></div>
+          <div id="flow-chart" class="chart-plot"></div>
+          <details id="flow-details" class="chart-details">
+            <summary>Pokaż liczby</summary>
+            <div id="flow-table"></div>
+          </details>
+        </article>
+
+        <article class="card chart-card">
+          <h2 class="chart-question">Czy wydaję szybciej niż zwykle?</h2>
+          <p id="pace-headline" class="chart-headline"></p>
+          <div id="pace-legend" class="chart-legend"></div>
+          <div id="pace-chart" class="chart-plot"></div>
+          <details id="pace-details" class="chart-details">
+            <summary>Pokaż liczby</summary>
+            <div id="pace-table"></div>
+          </details>
+        </article>
+
+        <article class="card chart-card">
+          <h2 class="chart-question">Na co idą pieniądze?</h2>
+          <p id="where-headline" class="chart-headline"></p>
+          <div id="where-chart" class="where-chart"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <!-- Panel edycji wpisu -->
+  <div id="edit-backdrop" class="backdrop" hidden></div>
+  <form id="edit-sheet" class="sheet edit-sheet" role="dialog" aria-modal="true" aria-labelledby="edit-title" novalidate hidden>
+    <h2 id="edit-title" class="sheet-title" tabindex="-1"></h2>
+    <div class="edit-date-row">
+      <button id="edit-date" type="button" class="date-pill" aria-haspopup="dialog" aria-label="Zmień datę">
+        <span id="edit-date-value"></span>
+      </button>
+    </div>
+    <div class="amount-line">
+      <span id="edit-amount-sizer" class="amount-sizer" data-value="0,00">
+        <input id="edit-amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0,00" aria-label="Kwota w PLN">
+      </span>
+      <span class="currency" aria-hidden="true">PLN</span>
+    </div>
+    <div id="edit-categories" class="edit-categories" role="group" aria-label="Kategoria"></div>
+    <div class="note-block">
+      <input id="edit-note" type="text" maxlength="40" autocomplete="off" autocapitalize="sentences" aria-label="Opis">
+    </div>
+    <p id="edit-error" class="error" role="alert" hidden></p>
+    <button id="edit-save" type="submit" class="btn-primary">Zapisz zmiany</button>
+    <button id="edit-delete" type="button" class="edit-delete"></button>
+  </form>
+
+  <!-- Panel kopii danych -->
+  <div id="backup-backdrop" class="backdrop" hidden></div>
+  <div id="backup-sheet" class="sheet backup-sheet" role="dialog" aria-modal="true" aria-labelledby="backup-title" hidden>
+    <div id="backup-icon" class="category-preview backup-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="38" height="38"><path d="M12 3l7 3v5.5c0 4.4-2.9 7.9-7 9.5-4.1-1.6-7-5.1-7-9.5V6l7-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2.2 2.2L15.2 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h2 id="backup-title" class="backup-title" tabindex="-1"></h2>
+    <p id="backup-status" class="backup-status"></p>
+    <div class="backup-stats">
+      <div class="backup-stat"><strong id="backup-count-expenses"></strong><span>wydatki</span></div>
+      <div class="backup-stat"><strong id="backup-count-incomes"></strong><span>wpływy</span></div>
+      <div class="backup-stat"><strong id="backup-count-categories"></strong><span>kategorie</span></div>
+    </div>
+    <p id="backup-error" class="error" role="alert" hidden></p>
+
+    <div id="backup-actions" class="backup-actions">
+      <button id="backup-save" type="button" class="btn-primary ready">Zapisz kopię</button>
+      <button id="backup-load" type="button" class="btn-ghost">Wczytaj kopię</button>
+      <p class="backup-hint">Zapisz plik poza telefonem, np. na Dysku Google lub w iCloud. Wtedy przetrwa nawet jego utratę.</p>
+    </div>
+
+    <div id="backup-confirm" class="backup-actions" hidden>
+      <p id="backup-confirm-text" class="backup-confirm-text"></p>
+      <p class="backup-hint">Zastąpi to wszystkie dane w tej aplikacji. Zaraz po wczytaniu możesz to cofnąć.</p>
+      <button id="backup-confirm-yes" type="button" class="btn-primary ready">Wczytaj i zastąp</button>
+      <button id="backup-confirm-no" type="button" class="btn-ghost">Anuluj</button>
+    </div>
+    <input id="backup-file" type="file" accept=".json,application/json" hidden>
+  </div>
+
+  <!-- Kalendarz wysuwany od dołu -->
+  <div id="calendar-backdrop" class="backdrop" hidden></div>
+  <div id="calendar-sheet" class="sheet" role="dialog" aria-modal="true" aria-label="Wybór daty" hidden>
+    <div class="sheet-quick">
+      <button id="calendar-today" type="button" class="chip">Dziś</button>
+      <button id="calendar-yesterday" type="button" class="chip">Wczoraj</button>
+    </div>
+    <div class="calendar-head">
+      <button id="calendar-prev" type="button" class="calendar-arrow" aria-label="Poprzedni miesiąc">‹</button>
+      <span id="calendar-title" class="calendar-title" aria-live="polite"></span>
+      <button id="calendar-next" type="button" class="calendar-arrow" aria-label="Następny miesiąc">›</button>
+    </div>
+    <div class="calendar-weekdays" aria-hidden="true">
+      <span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span>
+    </div>
+    <div id="calendar-grid" class="calendar-grid"></div>
+  </div>
+
+  <!-- Panel nowej kategorii wysuwany od dołu -->
+  <div id="category-backdrop" class="backdrop" hidden></div>
+  <form id="category-sheet" class="sheet" novalidate hidden>
+    <h2 id="category-sheet-title" class="sheet-title"></h2>
+    <div id="category-preview" class="category-preview" aria-hidden="true"></div>
+    <input id="new-category" class="category-name-input" type="text" maxlength="30" autocomplete="off" autocapitalize="sentences" placeholder="Nazwa" aria-label="Nazwa">
+    <div id="icon-grid" class="icon-grid" role="group" aria-label="Ikona"></div>
+    <button id="new-category-save" type="submit" class="btn-primary">Dodaj</button>
+  </form>
+
+  <!-- Krótki komunikat z przyciskiem Cofnij -->
+  <div id="toast" class="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-undo" type="button" class="btn-link">Cofnij</button>
+  </div>
+
+  <!-- Panel filtrów wysuwany z boku -->
+  <div id="filter-backdrop" class="backdrop" hidden></div>
+  <aside id="filter-panel" class="filter-panel" aria-label="Filtr kategorii" hidden>
+    <div class="filter-head">
+      <h2 id="filter-title"></h2>
+      <button id="filter-close" type="button" class="btn-link">Zamknij</button>
+    </div>
+    <div id="filter-options" class="filter-options"></div>
+    <button id="filter-clear" type="button" class="btn-secondary">Pokaż wszystkie</button>
+  </aside>
+
+  <!-- Dymek z wartościami na wykresach -->
+  <div id="chart-tooltip" class="chart-tooltip" role="status" hidden></div>
+
+  <script src="app.js"></script>
+  <script src="charts.js"></script>
+</body>
+</html>
