@@ -76,15 +76,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   border-radius: 18px;
 }
 
-select {
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
 /* --- Ekran dodawania: kwota na środku, reszta nad i pod nią --- */
 /* Pod spodem zostaje 52px, żeby było widać początek listy ostatnich wydatków */
 .entry {
@@ -469,8 +460,38 @@ select {
   font-size: .9rem;
 }
 .segmented button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
-.period-selects { display: flex; gap: 8px; }
-.period-selects select { flex: 1; min-width: 0; }
+
+/* Panel wyboru miesiąca lub roku; kropka oznacza, że są tam wpisy */
+.period-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.period-option {
+  position: relative;
+  min-height: 52px;
+  padding: 6px 4px;
+  background: var(--surface-2);
+  border: 0;
+  border-radius: 14px;
+  font-size: .9rem;
+  font-weight: 500;
+}
+.period-option:disabled { background: none; color: var(--line); cursor: default; }
+.period-option.has-entries::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  background: var(--plasma-text);
+  border-radius: 50%;
+}
+.period-option[aria-pressed="true"] {
+  background: var(--plasma);
+  box-shadow: 0 0 18px var(--glow);
+  color: #ffffff;
+  font-weight: 700;
+}
+.period-option[aria-pressed="true"]::after { background: #ffffff; }
 
 /* Jedna główna liczba na ekranie: bilans */
 .total { padding: 24px 0 16px; text-align: center; }

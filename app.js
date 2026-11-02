@@ -171,6 +171,7 @@ let pendingImport = null; // kopia wybrana z pliku, czeka na potwierdzenie
 let summaryMode = "month";
 let summaryMonth = now.getMonth();
 let summaryYear = now.getFullYear();
+let periodSheetYear = summaryYear; // rok oglądany w panelu wyboru miesiąca
 let summaryView = "expense"; // którą listę pokazuje podsumowanie
 const hiddenCategories = { expense: new Set(), income: new Set() }; // odznaczone w filtrze
 const expandedCategories = { expense: new Set(), income: new Set() }; // rozwinięte w podsumowaniu
@@ -1018,23 +1019,79 @@ function renderRecent() {
 function renderPeriodControls() {
   $("mode-month").setAttribute("aria-pressed", String(summaryMode === "month"));
   $("mode-year").setAttribute("aria-pressed", String(summaryMode === "year"));
-  $("select-month").hidden = summaryMode !== "month";
+}
 
-  const monthSelect = $("select-month");
-  if (monthSelect.options.length === 0) {
-    MONTHS.forEach((name, index) => monthSelect.add(new Option(name, index)));
-  }
-  monthSelect.value = summaryMonth;
-
-  // Na liście są lata, w których coś wpisano, oraz bieżący i wybrany rok.
+// Lata, w których coś wpisano, oraz bieżący i wybrany rok, od najnowszego.
+function availableYears() {
   const years = [...data.transactions, ...data.incomes].map((t) => Number(t.date.slice(0, 4)));
   years.push(new Date().getFullYear(), summaryYear);
-  const yearSelect = $("select-year");
-  yearSelect.replaceChildren();
-  for (const year of [...new Set(years)].sort((a, b) => b - a)) {
-    yearSelect.add(new Option(year, year));
+  return [...new Set(years)].sort((a, b) => b - a);
+}
+
+// --- Panel wyboru miesiąca lub roku ---
+
+function openPeriodSheet(mode) {
+  summaryMode = mode;
+  periodSheetYear = summaryYear;
+  renderSummary();
+  renderPeriodSheet();
+  openSheet("period-sheet", "period-backdrop");
+  $("period-title").focus({ preventScroll: true });
+}
+
+function closePeriodSheet() {
+  closeSheet("period-sheet", "period-backdrop", summaryMode === "month" ? "mode-month" : "mode-year");
+}
+
+function periodOption(label, selected, disabled, hasEntries, onPick) {
+  const button = element("button", "period-option", label);
+  button.type = "button";
+  button.setAttribute("aria-pressed", String(selected));
+  button.disabled = disabled;
+  button.classList.toggle("has-entries", hasEntries);
+  button.addEventListener("click", onPick);
+  return button;
+}
+
+function renderPeriodSheet() {
+  const today = new Date();
+  const isMonth = summaryMode === "month";
+  const years = availableYears();
+  const used = new Set([...data.transactions, ...data.incomes].map((t) => t.date.slice(0, 7)));
+  const grid = $("period-grid");
+
+  $("period-title").textContent = isMonth ? "Wybierz miesiąc" : "Wybierz rok";
+  $("period-year-row").hidden = !isMonth;
+  grid.replaceChildren();
+
+  if (!isMonth) {
+    for (const year of years) {
+      const hasEntries = [...used].some((key) => key.startsWith(`${year}-`));
+      grid.append(periodOption(String(year), year === summaryYear, false, hasEntries, () => {
+        summaryYear = year;
+        // Po zmianie roku miesiąc nie może wskazywać przyszłości.
+        if (year === today.getFullYear()) summaryMonth = Math.min(summaryMonth, today.getMonth());
+        closePeriodSheet();
+        renderSummary();
+      }));
+    }
+    return;
   }
-  yearSelect.value = summaryYear;
+
+  $("period-year").textContent = String(periodSheetYear);
+  $("period-year-prev").disabled = periodSheetYear <= years[years.length - 1];
+  $("period-year-next").disabled = periodSheetYear >= today.getFullYear();
+  MONTHS.forEach((name, month) => {
+    const key = `${periodSheetYear}-${String(month + 1).padStart(2, "0")}`;
+    const isFuture = periodSheetYear === today.getFullYear() && month > today.getMonth();
+    const selected = month === summaryMonth && periodSheetYear === summaryYear;
+    grid.append(periodOption(name, selected, isFuture, used.has(key), () => {
+      summaryMonth = month;
+      summaryYear = periodSheetYear;
+      closePeriodSheet();
+      renderSummary();
+    }));
+  });
 }
 
 function transactionsInPeriod(kind) {
@@ -1620,10 +1677,11 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("scroll", updateKeyboardOffset);
 }
 
-$("mode-month").addEventListener("click", () => { summaryMode = "month"; renderSummary(); });
-$("mode-year").addEventListener("click", () => { summaryMode = "year"; renderSummary(); });
-$("select-month").addEventListener("change", (e) => { summaryMonth = Number(e.target.value); renderSummary(); });
-$("select-year").addEventListener("change", (e) => { summaryYear = Number(e.target.value); renderSummary(); });
+$("mode-month").addEventListener("click", () => openPeriodSheet("month"));
+$("mode-year").addEventListener("click", () => openPeriodSheet("year"));
+$("period-backdrop").addEventListener("click", closePeriodSheet);
+$("period-year-prev").addEventListener("click", () => { periodSheetYear -= 1; renderPeriodSheet(); });
+$("period-year-next").addEventListener("click", () => { periodSheetYear += 1; renderPeriodSheet(); });
 
 $("view-income").addEventListener("click", () => { summaryView = "income"; renderSummary(); });
 $("view-expense").addEventListener("click", () => { summaryView = "expense"; renderSummary(); });
@@ -1646,6 +1704,7 @@ document.addEventListener("keydown", (event) => {
     closeFilter();
     setCategoryPanel(false);
     closeCategorySheet();
+    closePeriodSheet();
     if (editing) closeEditSheet();
     closeBackupSheet();
   }

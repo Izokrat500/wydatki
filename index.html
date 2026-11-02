@@ -81,12 +81,8 @@
       <section id="tab-podsumowanie" class="tab" hidden>
         <div class="period">
           <div class="segmented" role="group" aria-label="Rodzaj okresu">
-            <button id="mode-month" type="button">Miesiąc</button>
-            <button id="mode-year" type="button">Rok</button>
-          </div>
-          <div class="period-selects">
-            <select id="select-month" aria-label="Miesiąc"></select>
-            <select id="select-year" aria-label="Rok"></select>
+            <button id="mode-month" type="button" aria-haspopup="dialog">Miesiąc</button>
+            <button id="mode-year" type="button" aria-haspopup="dialog">Rok</button>
           </div>
         </div>
 
@@ -159,6 +155,18 @@
         </article>
       </section>
     </main>
+  </div>
+
+  <!-- Panel wyboru miesiąca lub roku w Podsumowaniu -->
+  <div id="period-backdrop" class="backdrop" hidden></div>
+  <div id="period-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="period-title" hidden>
+    <h2 id="period-title" class="sheet-title" tabindex="-1"></h2>
+    <div id="period-year-row" class="calendar-head">
+      <button id="period-year-prev" type="button" class="calendar-arrow" aria-label="Poprzedni rok">‹</button>
+      <span id="period-year" class="calendar-title" aria-live="polite"></span>
+      <button id="period-year-next" type="button" class="calendar-arrow" aria-label="Następny rok">›</button>
+    </div>
+    <div id="period-grid" class="period-grid"></div>
   </div>
 
   <!-- Panel edycji wpisu -->
