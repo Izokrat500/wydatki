@@ -277,6 +277,7 @@ function showTab(name) {
   $("tab-transakcje").hidden = name !== "wydatki" && name !== "wplywy";
   $("tab-podsumowanie").hidden = name !== "podsumowanie";
   $("tab-wykresy").hidden = name !== "wykresy";
+  $("filter-open").hidden = name !== "podsumowanie";
   for (const tab of TABS) {
     const button = $("nav-" + tab);
     if (tab === name) button.setAttribute("aria-current", "page");
@@ -1601,6 +1602,96 @@ function confirmImport() {
   });
 }
 
+// --- Przesuwanie palcem między kartami ---
+
+// Tam poziomy ruch palca robi już coś innego: wybór punktu na wykresie, usuwanie kategorii, pisanie.
+const TAB_SWIPE_IGNORE = ".chart-hit-scrub, #category-panel, input";
+const TAB_SWIPE_LOCK_PX = 10;
+const TAB_SWIPE_FLICK_PX = 40;
+const TAB_SWIPE_FLICK_MS = 250;
+const TAB_SWIPE_MS = 180;
+
+function setupTabSwipe() {
+  const main = document.querySelector("main");
+  let start = null;
+  let animating = false;
+
+  const neighbour = (dx) => TABS[TABS.indexOf(activeTab) + (dx < 0 ? 1 : -1)];
+
+  const settleBack = () => {
+    main.classList.remove("swiping");
+    main.style.transform = "";
+  };
+
+  // Stary ekran wyjeżdża, nowy wjeżdża z drugiej strony.
+  const slideTo = (tab, direction) => {
+    animating = true;
+    main.classList.remove("swiping");
+    main.style.transform = `translateX(${direction * 100}%)`;
+    setTimeout(() => {
+      main.classList.add("swiping");
+      if (document.activeElement) document.activeElement.blur();
+      showTab(tab);
+      main.style.transform = `translateX(${-direction * 100}%)`;
+      main.getBoundingClientRect(); // przeglądarka musi poznać pozycję startową
+      main.classList.remove("swiping");
+      main.style.transform = "";
+      setTimeout(() => { animating = false; }, TAB_SWIPE_MS);
+    }, TAB_SWIPE_MS);
+  };
+
+  main.addEventListener("touchstart", (event) => {
+    start = null;
+    if (animating || event.touches.length !== 1 || event.target.closest(TAB_SWIPE_IGNORE)) return;
+    const touch = event.touches[0];
+    start = { x: touch.clientX, y: touch.clientY, time: Date.now(), locked: false };
+  }, { passive: true });
+
+  main.addEventListener("touchmove", (event) => {
+    if (!start) return;
+    if (event.touches.length !== 1) {
+      if (start.locked) settleBack();
+      start = null;
+      return;
+    }
+    const dx = event.touches[0].clientX - start.x;
+    const dy = event.touches[0].clientY - start.y;
+    if (!start.locked) {
+      if (Math.abs(dx) < TAB_SWIPE_LOCK_PX && Math.abs(dy) < TAB_SWIPE_LOCK_PX) return;
+      // Ruch bardziej pionowy niż poziomy to zwykłe przewijanie.
+      if (Math.abs(dx) <= Math.abs(dy) * 1.2) {
+        start = null;
+        return;
+      }
+      start.locked = true;
+      main.classList.add("swiping");
+      hideChartTooltip();
+    }
+    event.preventDefault();
+    // Na brzegu nie ma dokąd przejść, więc ekran tylko delikatnie stawia opór.
+    main.style.transform = `translateX(${neighbour(dx) ? dx : dx * 0.25}px)`;
+  }, { passive: false });
+
+  main.addEventListener("touchend", (event) => {
+    if (!start || !start.locked) {
+      start = null;
+      return;
+    }
+    const dx = event.changedTouches[0].clientX - start.x;
+    const isFlick = Math.abs(dx) > TAB_SWIPE_FLICK_PX && Date.now() - start.time < TAB_SWIPE_FLICK_MS;
+    const farEnough = Math.abs(dx) > main.offsetWidth * 0.25;
+    const tab = neighbour(dx);
+    start = null;
+    if (tab && (farEnough || isFlick)) slideTo(tab, dx < 0 ? -1 : 1);
+    else settleBack();
+  });
+
+  main.addEventListener("touchcancel", () => {
+    if (start && start.locked) settleBack();
+    start = null;
+  });
+}
+
 // --- Start aplikacji ---
 
 for (const tab of TABS) $("nav-" + tab).addEventListener("click", () => showTab(tab));
@@ -1732,6 +1823,7 @@ renderEntryTexts();
 renderCategories();
 renderRecent();
 showTab("wydatki");
+setupTabSwipe();
 updateBackupIndicator();
 maybeRemindBackup();
 

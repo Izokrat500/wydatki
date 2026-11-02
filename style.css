@@ -64,9 +64,11 @@ body {
   max-width: 560px;
   min-height: 100dvh;
   margin: 0 auto;
+  overflow-x: clip; /* przesuwany ekran nie tworzy poziomego przewijania */
 }
 
-main { padding: 0 16px; }
+main { padding: 0 16px; transition: transform .18s ease-out; }
+main.swiping { transition: none; }
 
 /* env() omija notch i pasek iPhone'a; w Podsumowaniu dół zostawia miejsce na przycisk filtra */
 #tab-transakcje { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
