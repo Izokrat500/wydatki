@@ -5,7 +5,11 @@ const CHART_TOP_CATEGORIES = 5;
 const CHART_HEIGHT = 190;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-let chartsMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+const YEAR_MONTHS = 12;
+
+function selectedMonth() {
+  return new Date(summaryYear, summaryMonth, 1);
+}
 
 function svgElement(tag, attributes, parent) {
   const el = document.createElementNS(SVG_NS, tag);
@@ -140,9 +144,12 @@ function hideChartTooltip() {
 // --- Wykres 1: wpływy i wydatki z ostatnich miesięcy ---
 
 function renderFlowChart() {
+  const isYear = summaryMode === "year";
+  const lastMonth = isYear ? new Date(summaryYear, YEAR_MONTHS - 1, 1) : selectedMonth();
+  const count = isYear ? YEAR_MONTHS : CHART_MONTHS_BACK;
   const months = [];
-  for (let i = CHART_MONTHS_BACK - 1; i >= 0; i--) {
-    const date = addMonths(chartsMonth, -i);
+  for (let i = count - 1; i >= 0; i--) {
+    const date = addMonths(lastMonth, -i);
     const key = monthKey(date);
     months.push({
       date,
@@ -155,7 +162,7 @@ function renderFlowChart() {
   const totalExpense = months.reduce((sum, m) => sum + m.expense, 0);
   const hasData = totalIncome + totalExpense > 0;
   $("flow-headline").textContent = hasData
-    ? `Bilans z ${CHART_MONTHS_BACK} miesięcy: ${signedMoney(totalIncome - totalExpense)}`
+    ? `${isYear ? `Bilans ${summaryYear}` : `Bilans z ${CHART_MONTHS_BACK} miesięcy`}: ${signedMoney(totalIncome - totalExpense)}`
     : "Dodaj wpływy i wydatki, a pojawi się tu ich porównanie";
   $("flow-legend").hidden = !hasData;
   $("flow-details").hidden = !hasData;
@@ -174,7 +181,7 @@ function renderFlowChart() {
   const maxValue = niceMax(largest);
   const y = drawGrid(plot, maxValue);
   const band = (plot.right - plot.left) / months.length;
-  const barWidth = Math.min(16, (band - 14) / 2);
+  const barWidth = Math.min(16, (band - (isYear ? 5 : 14)) / 2);
 
   months.forEach((month, index) => {
     const center = plot.left + band * (index + 0.5);
@@ -191,7 +198,7 @@ function renderFlowChart() {
     drawColumn(group, center - barWidth - 1, barWidth, month.income / 100, y, plot.bottom, "bar-income");
     drawColumn(group, center + 1, barWidth, month.expense / 100, y, plot.bottom, "bar-expense");
 
-    const selected = index === months.length - 1;
+    const selected = !isYear && index === months.length - 1;
     const label = svgElement("text", {
       x: center,
       y: CHART_HEIGHT - 7,
@@ -263,10 +270,75 @@ function cumulativeByDay(date, lastDay) {
   return totals;
 }
 
-function paceHeadline(current, previous, ongoing) {
+function cumulativeByMonth(year, lastMonth) {
+  const totals = new Array(lastMonth + 1).fill(0);
+  for (const transaction of transactionsInMonth("expense", String(year))) {
+    const month = Number(transaction.date.slice(5, 7));
+    if (month <= lastMonth) totals[month] += transaction.grosze;
+  }
+  for (let month = 1; month <= lastMonth; month++) totals[month] += totals[month - 1];
+  return totals;
+}
+
+// Dane drugiego wykresu: dni miesiąca na tle poprzedniego albo miesiące roku na tle poprzedniego.
+function paceSeries() {
+  const today = new Date();
+  if (summaryMode === "year") {
+    const ongoing = summaryYear === today.getFullYear();
+    const lastPoint = ongoing ? today.getMonth() + 1 : YEAR_MONTHS;
+    return {
+      ongoing,
+      unit: "rok",
+      lastPoint,
+      previousLastPoint: YEAR_MONTHS,
+      lastX: YEAR_MONTHS,
+      current: cumulativeByMonth(summaryYear, lastPoint),
+      previous: cumulativeByMonth(summaryYear - 1, YEAR_MONTHS),
+      currentName: String(summaryYear),
+      previousName: String(summaryYear - 1),
+      ticks: [1, 4, 7, 10, YEAR_MONTHS],
+      tickLabel: (month) => MONTHS_SHORT[month - 1],
+      pointTitle: (month) => `Do końca: ${MONTHS[month - 1].toLowerCase()}`,
+      tableHeader: "Do końca",
+      tablePoints: Array.from({ length: YEAR_MONTHS }, (_, i) => i + 1),
+      tableLabel: (month) => MONTHS_SHORT[month - 1],
+      noData: `Brak wydatków w latach ${summaryYear - 1} i ${summaryYear}`,
+    };
+  }
+  const month = selectedMonth();
+  const previousMonth = addMonths(month, -1);
+  const ongoing = isCurrentMonth(month);
+  const lastPoint = ongoing ? today.getDate() : daysInMonth(month);
+  const previousLastPoint = daysInMonth(previousMonth);
+  const lastX = Math.max(daysInMonth(month), previousLastPoint);
+  const tablePoints = [];
+  for (let day = 5; day < lastX; day += 5) tablePoints.push(day);
+  tablePoints.push(lastX);
+  return {
+    ongoing,
+    unit: "miesiąc",
+    lastPoint,
+    previousLastPoint,
+    lastX,
+    current: cumulativeByDay(month, lastPoint),
+    previous: cumulativeByDay(previousMonth, previousLastPoint),
+    currentName: MONTHS[month.getMonth()],
+    previousName: MONTHS[previousMonth.getMonth()],
+    ticks: [1, 10, 20, lastX],
+    tickLabel: (day) => String(day),
+    pointTitle: (day) => `Do ${day}. dnia miesiąca`,
+    tableHeader: "Do dnia",
+    tablePoints,
+    tableLabel: (day) => String(day),
+    noData: "Brak wydatków w tym i poprzednim miesiącu",
+  };
+}
+
+function paceHeadline(current, previous, ongoing, unit) {
   const verb = ongoing ? "są" : "były";
-  const when = ongoing ? "niż o tej porze miesiąc temu" : "niż miesiąc wcześniej";
-  if (previous === 0) return `${ongoing ? "Do dziś wydano" : "W tym miesiącu wydano"} ${formatMoney(current)}`;
+  const when = ongoing ? `niż o tej porze ${unit} temu` : `niż ${unit} wcześniej`;
+  const inPeriod = unit === "rok" ? "W tym roku" : "W tym miesiącu";
+  if (previous === 0) return `${ongoing ? `${inPeriod} wydano już` : `${inPeriod} wydano`} ${formatMoney(current)}`;
   if (current === previous) return `Wydatki ${verb} takie same ${when}`;
   if (current >= previous * 2) {
     const times = String(Math.round((current / previous) * 10) / 10).replace(".", ",");
@@ -277,68 +349,65 @@ function paceHeadline(current, previous, ongoing) {
 }
 
 function renderPaceChart() {
-  const previousMonth = addMonths(chartsMonth, -1);
-  const ongoing = isCurrentMonth(chartsMonth);
-  const lastDay = ongoing ? new Date().getDate() : daysInMonth(chartsMonth);
-  const previousLastDay = daysInMonth(previousMonth);
-  const current = cumulativeByDay(chartsMonth, lastDay);
-  const previous = cumulativeByDay(previousMonth, previousLastDay);
-  const hasData = current[lastDay] + previous[previousLastDay] > 0;
+  const series = paceSeries();
+  const { current, previous, lastPoint, previousLastPoint, lastX, currentName, previousName } = series;
+  const hasData = current[lastPoint] + previous[previousLastPoint] > 0;
 
   $("pace-headline").textContent = hasData
-    ? paceHeadline(current[lastDay], previous[Math.min(lastDay, previousLastDay)], ongoing)
-    : "Brak wydatków w tym i poprzednim miesiącu";
+    ? paceHeadline(current[lastPoint], previous[Math.min(lastPoint, previousLastPoint)], series.ongoing, series.unit)
+    : series.noData;
   $("pace-legend").hidden = !hasData;
   $("pace-details").hidden = !hasData;
+  paceClear = null;
   if (!hasData) {
     $("pace-chart").replaceChildren();
     return;
   }
 
-  const currentName = MONTHS[chartsMonth.getMonth()];
-  const previousName = MONTHS[previousMonth.getMonth()];
   renderLegend("pace-legend", [
     { label: currentName, className: "key-line-expense" },
     { label: previousName, className: "key-line-muted" },
   ]);
 
   const plot = plotArea("pace-chart", { left: 46, right: 10, top: 12, bottom: 24 });
-  const maxValue = niceMax(Math.max(current[lastDay], previous[previousLastDay]) / 100);
+  const maxValue = niceMax(Math.max(current[lastPoint], previous[previousLastPoint]) / 100);
   const y = drawGrid(plot, maxValue);
-  const lastX = Math.max(daysInMonth(chartsMonth), previousLastDay);
-  const x = (day) => plot.left + ((day - 1) / (lastX - 1)) * (plot.right - plot.left);
+  const x = (point) => plot.left + ((point - 1) / (lastX - 1)) * (plot.right - plot.left);
 
   const linePath = (values, end) => {
     let d = "";
-    for (let day = 1; day <= end; day++) d += `${day === 1 ? "M" : "L"}${x(day)} ${y(values[day] / 100)}`;
+    for (let point = 1; point <= end; point++) d += `${point === 1 ? "M" : "L"}${x(point)} ${y(values[point] / 100)}`;
     return d;
   };
 
-  // Delikatna plazmowa poświata pod linią bieżącego miesiąca.
+  // Delikatna plazmowa poświata pod linią wybranego okresu.
   const defs = svgElement("defs", {}, plot.svg);
   const gradient = svgElement("linearGradient", { id: "pace-wash", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
   svgElement("stop", { offset: "0%", "stop-color": "var(--chart-expense)", "stop-opacity": 0.28 }, gradient);
   svgElement("stop", { offset: "100%", "stop-color": "var(--chart-expense)", "stop-opacity": 0 }, gradient);
 
-  svgElement("path", { d: linePath(previous, previousLastDay), class: "chart-line chart-line-muted" }, plot.svg);
+  svgElement("path", { d: linePath(previous, previousLastPoint), class: "chart-line chart-line-muted" }, plot.svg);
   svgElement("path", {
-    d: `${linePath(current, lastDay)}L${x(lastDay)} ${plot.bottom}L${x(1)} ${plot.bottom}Z`,
+    d: `${linePath(current, lastPoint)}L${x(lastPoint)} ${plot.bottom}L${x(1)} ${plot.bottom}Z`,
     fill: "url(#pace-wash)",
     class: "chart-wash",
   }, plot.svg);
-  svgElement("path", { d: linePath(current, lastDay), class: "chart-line chart-line-expense" }, plot.svg);
+  svgElement("path", { d: linePath(current, lastPoint), class: "chart-line chart-line-expense" }, plot.svg);
   svgElement("circle", {
-    cx: x(lastDay), cy: y(current[lastDay] / 100), r: 5, class: "chart-end-dot",
+    cx: x(lastPoint), cy: y(current[lastPoint] / 100), r: 5, class: "chart-end-dot",
   }, plot.svg);
 
-  for (const day of [1, 10, 20, lastX]) {
+  for (const point of series.ticks) {
     const label = svgElement("text", {
-      x: x(day), y: CHART_HEIGHT - 7, "text-anchor": day === 1 ? "start" : day === lastX ? "end" : "middle", class: "chart-tick",
+      x: x(point),
+      y: CHART_HEIGHT - 7,
+      "text-anchor": point === 1 ? "start" : point === lastX ? "end" : "middle",
+      class: "chart-tick",
     }, plot.svg);
-    label.textContent = String(day);
+    label.textContent = series.tickLabel(point);
   }
 
-  // Pionowa linia podąża za palcem i pokazuje wartości obu miesięcy tego samego dnia.
+  // Pionowa linia podąża za palcem i pokazuje wartości obu okresów w tym samym punkcie.
   const crosshair = svgElement("line", {
     y1: plot.top, y2: plot.bottom, class: "chart-crosshair", visibility: "hidden",
   }, plot.svg);
@@ -354,70 +423,67 @@ function renderPaceChart() {
     tabindex: 0,
     role: "img",
     "data-chart-hit": "true",
-    "aria-label": `${$("pace-headline").textContent}. Strzałki w lewo i w prawo zmieniają dzień.`,
+    "aria-label": `${$("pace-headline").textContent}. Strzałki w lewo i w prawo zmieniają punkt na wykresie.`,
   }, plot.svg);
 
-  let focusedDay = lastDay;
-  const showDay = (day, clientX, clientY) => {
-    focusedDay = day;
+  let focusedPoint = lastPoint;
+  const showPoint = (point, clientX, clientY) => {
+    focusedPoint = point;
     const rows = [];
-    crosshair.setAttribute("x1", x(day));
-    crosshair.setAttribute("x2", x(day));
+    crosshair.setAttribute("x1", x(point));
+    crosshair.setAttribute("x2", x(point));
     crosshair.setAttribute("visibility", "visible");
-    if (day <= lastDay) {
-      markerCurrent.setAttribute("cx", x(day));
-      markerCurrent.setAttribute("cy", y(current[day] / 100));
+    if (point <= lastPoint) {
+      markerCurrent.setAttribute("cx", x(point));
+      markerCurrent.setAttribute("cy", y(current[point] / 100));
       markerCurrent.setAttribute("visibility", "visible");
-      rows.push({ value: formatMoney(current[day]), label: currentName.toLowerCase(), className: "key-line-expense" });
+      rows.push({ value: formatMoney(current[point]), label: currentName.toLowerCase(), className: "key-line-expense" });
     } else {
       markerCurrent.setAttribute("visibility", "hidden");
     }
-    if (day <= previousLastDay) {
-      markerPrevious.setAttribute("cx", x(day));
-      markerPrevious.setAttribute("cy", y(previous[day] / 100));
+    if (point <= previousLastPoint) {
+      markerPrevious.setAttribute("cx", x(point));
+      markerPrevious.setAttribute("cy", y(previous[point] / 100));
       markerPrevious.setAttribute("visibility", "visible");
-      rows.push({ value: formatMoney(previous[day]), label: previousName.toLowerCase(), className: "key-line-muted" });
+      rows.push({ value: formatMoney(previous[point]), label: previousName.toLowerCase(), className: "key-line-muted" });
     } else {
       markerPrevious.setAttribute("visibility", "hidden");
     }
-    showChartTooltip(`Do ${day}. dnia miesiąca`, rows, clientX, clientY);
+    showChartTooltip(series.pointTitle(point), rows, clientX, clientY);
   };
-  const clearDay = () => {
+  const clearPoint = () => {
     for (const mark of [crosshair, markerCurrent, markerPrevious]) mark.setAttribute("visibility", "hidden");
     hideChartTooltip();
   };
-  const dayFromEvent = (event) => {
+  const pointFromEvent = (event) => {
     const box = plot.svg.getBoundingClientRect();
     const ratio = (event.clientX - box.left - plot.left) / (plot.right - plot.left);
     return Math.max(1, Math.min(lastX, Math.round(ratio * (lastX - 1)) + 1));
   };
-  const onPointer = (event) => showDay(dayFromEvent(event), event.clientX, event.clientY);
+  const onPointer = (event) => showPoint(pointFromEvent(event), event.clientX, event.clientY);
   hit.addEventListener("pointerdown", onPointer);
   hit.addEventListener("pointermove", onPointer);
   hit.addEventListener("pointerleave", (event) => {
-    if (event.pointerType === "mouse") clearDay();
+    if (event.pointerType === "mouse") clearPoint();
   });
   const showFocused = () => {
     const box = plot.svg.getBoundingClientRect();
-    showDay(focusedDay, box.left + x(focusedDay), box.top + 30);
+    showPoint(focusedPoint, box.left + x(focusedPoint), box.top + 30);
   };
   hit.addEventListener("focus", showFocused);
-  hit.addEventListener("blur", clearDay);
+  hit.addEventListener("blur", clearPoint);
   hit.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    focusedDay = Math.max(1, Math.min(lastX, focusedDay + (event.key === "ArrowLeft" ? -1 : 1)));
+    focusedPoint = Math.max(1, Math.min(lastX, focusedPoint + (event.key === "ArrowLeft" ? -1 : 1)));
     showFocused();
   });
-  paceClear = clearDay;
+  paceClear = clearPoint;
 
-  const days = [];
-  for (let day = 5; day < lastX; day += 5) days.push(day);
-  days.push(lastX);
-  renderChartTable("pace-table", ["Do dnia", currentName, previousName], days.map((day) => [
-    String(day),
-    day <= lastDay ? formatNumber(current[day]) : "–",
-    day <= previousLastDay ? formatNumber(previous[day]) : "–",
+  renderChartTable("pace-table", [series.tableHeader, currentName, previousName], series.tablePoints.map((point) => [
+    series.tableLabel(point),
+    point <= lastPoint ? formatNumber(current[point]) : "–",
+    point <= previousLastPoint ? formatNumber(previous[point]) : "–",
   ]));
 }
 
@@ -426,13 +492,14 @@ let paceClear = null;
 // --- Wykres 3: na co idą pieniądze ---
 
 function renderWhereChart() {
-  const transactions = transactionsInMonth("expense", monthKey(chartsMonth));
+  const prefix = summaryMode === "year" ? String(summaryYear) : monthKey(selectedMonth());
+  const transactions = transactionsInMonth("expense", prefix);
   const total = sumOf(transactions);
   const box = $("where-chart");
   box.replaceChildren();
 
   if (total === 0) {
-    $("where-headline").textContent = "Brak wydatków w tym miesiącu";
+    $("where-headline").textContent = "Brak wydatków w tym okresie";
     return;
   }
 
@@ -469,8 +536,10 @@ function renderWhereChart() {
 
 function renderCharts() {
   hideChartTooltip();
-  $("charts-title").textContent = `${MONTHS[chartsMonth.getMonth()]} ${chartsMonth.getFullYear()}`;
-  $("charts-next").disabled = isCurrentMonth(chartsMonth);
+  renderPeriodControls();
+  $("charts-title").textContent = summaryMode === "year"
+    ? `Rok ${summaryYear}`
+    : `${MONTHS[summaryMonth]} ${summaryYear}`;
   renderFlowChart();
   renderPaceChart();
   renderWhereChart();
@@ -480,15 +549,6 @@ function chartsTabVisible() {
   return !$("tab-wykresy").hidden;
 }
 
-$("charts-prev").addEventListener("click", () => {
-  chartsMonth = addMonths(chartsMonth, -1);
-  renderCharts();
-});
-$("charts-next").addEventListener("click", () => {
-  if (isCurrentMonth(chartsMonth)) return;
-  chartsMonth = addMonths(chartsMonth, 1);
-  renderCharts();
-});
 // Stuknięcie poza wykresem albo przewinięcie chowa dymek.
 document.addEventListener("pointerdown", (event) => {
   if (event.target.closest && event.target.closest("[data-chart-hit]")) return;

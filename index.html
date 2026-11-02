@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Moje wydatki</title>
   <meta name="theme-color" content="#000000">
   <link rel="manifest" href="manifest.webmanifest">
@@ -120,11 +120,13 @@
 
       <!-- Zakładka Wykresy -->
       <section id="tab-wykresy" class="tab" hidden>
-        <div class="chart-period">
-          <button id="charts-prev" type="button" class="calendar-arrow" aria-label="Poprzedni miesiąc">‹</button>
-          <span id="charts-title" class="calendar-title" aria-live="polite"></span>
-          <button id="charts-next" type="button" class="calendar-arrow" aria-label="Następny miesiąc">›</button>
+        <div class="period">
+          <div class="segmented" role="group" aria-label="Rodzaj okresu">
+            <button id="charts-mode-month" type="button" aria-haspopup="dialog">Miesiąc</button>
+            <button id="charts-mode-year" type="button" aria-haspopup="dialog">Rok</button>
+          </div>
         </div>
+        <p id="charts-title" class="charts-title" aria-live="polite"></p>
 
         <article class="card chart-card">
           <h2 class="chart-question">Ile zarabiam, a ile wydaję?</h2>

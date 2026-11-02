@@ -1017,8 +1017,18 @@ function renderRecent() {
 // --- Zakładka Podsumowanie ---
 
 function renderPeriodControls() {
-  $("mode-month").setAttribute("aria-pressed", String(summaryMode === "month"));
-  $("mode-year").setAttribute("aria-pressed", String(summaryMode === "year"));
+  for (const id of ["mode-month", "charts-mode-month"]) {
+    $(id).setAttribute("aria-pressed", String(summaryMode === "month"));
+  }
+  for (const id of ["mode-year", "charts-mode-year"]) {
+    $(id).setAttribute("aria-pressed", String(summaryMode === "year"));
+  }
+}
+
+// Podsumowanie i Wykresy pokazują ten sam wybrany okres.
+function refreshPeriodViews() {
+  renderSummary();
+  if (activeTab === "wykresy") renderCharts();
 }
 
 // Lata, w których coś wpisano, oraz bieżący i wybrany rok, od najnowszego.
@@ -1033,14 +1043,15 @@ function availableYears() {
 function openPeriodSheet(mode) {
   summaryMode = mode;
   periodSheetYear = summaryYear;
-  renderSummary();
+  refreshPeriodViews();
   renderPeriodSheet();
   openSheet("period-sheet", "period-backdrop");
   $("period-title").focus({ preventScroll: true });
 }
 
 function closePeriodSheet() {
-  closeSheet("period-sheet", "period-backdrop", summaryMode === "month" ? "mode-month" : "mode-year");
+  const prefix = activeTab === "wykresy" ? "charts-mode-" : "mode-";
+  closeSheet("period-sheet", "period-backdrop", prefix + summaryMode);
 }
 
 function periodOption(label, selected, disabled, hasEntries, onPick) {
@@ -1072,7 +1083,7 @@ function renderPeriodSheet() {
         // Po zmianie roku miesiąc nie może wskazywać przyszłości.
         if (year === today.getFullYear()) summaryMonth = Math.min(summaryMonth, today.getMonth());
         closePeriodSheet();
-        renderSummary();
+        refreshPeriodViews();
       }));
     }
     return;
@@ -1089,7 +1100,7 @@ function renderPeriodSheet() {
       summaryMonth = month;
       summaryYear = periodSheetYear;
       closePeriodSheet();
-      renderSummary();
+      refreshPeriodViews();
     }));
   });
 }
@@ -1665,6 +1676,10 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshToday();
 });
 window.addEventListener("resize", updateTabIndicator);
+// iPhone ignoruje zakaz powiększania z nagłówka strony, więc blokujemy też sam gest.
+for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
+  document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+}
 
 // Klawiatura telefonu zasłania dół ekranu, więc panele unoszą się nad nią.
 if (window.visualViewport) {
@@ -1679,6 +1694,8 @@ if (window.visualViewport) {
 
 $("mode-month").addEventListener("click", () => openPeriodSheet("month"));
 $("mode-year").addEventListener("click", () => openPeriodSheet("year"));
+$("charts-mode-month").addEventListener("click", () => openPeriodSheet("month"));
+$("charts-mode-year").addEventListener("click", () => openPeriodSheet("year"));
 $("period-backdrop").addEventListener("click", closePeriodSheet);
 $("period-year-prev").addEventListener("click", () => { periodSheetYear -= 1; renderPeriodSheet(); });
 $("period-year-next").addEventListener("click", () => { periodSheetYear += 1; renderPeriodSheet(); });

@@ -35,11 +35,25 @@
   --glow: rgb(0 179 164 / .4);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  scrollbar-width: none; /* bez paska przewijania, jak w aplikacji natywnej */
+}
+*::-webkit-scrollbar { display: none; }
 [hidden] { display: none !important; }
+
+/* Bez powiększania palcami i dwukrotnym stuknięciem oraz bez odbijania strony na końcu */
+html {
+  background: var(--bg);
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 body {
   margin: 0;
+  overscroll-behavior: none;
   background: var(--bg);
   color: var(--text);
   font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -60,7 +74,10 @@ main { padding: 0 16px; }
   padding-top: 8px;
   padding-bottom: calc(88px + env(safe-area-inset-bottom));
 }
-#tab-wykresy { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+#tab-wykresy {
+  padding-top: 8px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
 
 .tab { animation: fade-in .22s ease-out; }
 
@@ -688,12 +705,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .filter-option input { width: 20px; height: 20px; flex: none; accent-color: var(--plasma-violet); }
 
 /* --- Wykresy --- */
-.chart-period {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
+.charts-title { margin: 12px 0; color: var(--muted); font-size: .9rem; text-align: center; }
 .chart-card { margin-bottom: 12px; padding: 16px; }
 .chart-question { margin: 0 0 2px; color: var(--muted); font-size: .85rem; font-weight: 500; }
 /* Wniosek zdaniem: najpierw odpowiedź, potem wykres */
