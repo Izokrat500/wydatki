@@ -633,6 +633,34 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
 .category-transactions { padding: 0 8px 4px 14px; animation: fade-in .18s ease-out; }
 
+/* Miesiąc w widoku rocznym: strzałka obraca się po rozwinięciu */
+.month-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 6px 7px 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+.month-row::after {
+  content: "›";
+  flex: none;
+  color: var(--faint);
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: transform .18s ease-out;
+}
+.month-row[aria-expanded="true"]::after { transform: rotate(90deg); }
+.month-name { display: block; font-weight: 500; }
+.month-sum { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.month-sum.income { color: var(--income-text); }
+.month-sum.savings { color: var(--savings-text); }
+.month-transactions { padding-left: 12px; border-left: 2px solid var(--line); animation: fade-in .18s ease-out; }
+
 /* Przycisk filtra przy prawej krawędzi */
 .filter-button {
   position: fixed;

@@ -158,6 +158,7 @@ let periodSheetYear = summaryYear; // rok oglądany w panelu wyboru miesiąca
 let summaryView = "expense"; // którą listę pokazuje podsumowanie
 const hiddenCategories = { expense: new Set(), income: new Set(), savings: new Set() }; // odznaczone w filtrze
 const expandedCategories = { expense: new Set(), income: new Set(), savings: new Set() }; // rozwinięte w podsumowaniu
+const expandedMonths = new Set(); // miesiące rozwinięte w widoku rocznym
 let okMessageTimer = null;
 let toastTimer = null;
 let toastUndo = null;
@@ -960,7 +961,8 @@ function transactionRow(transaction, showCategory, kind) {
     main.append(element("span", "tx-sub", formatDate(transaction.date)));
   }
 
-  const amountText = (kind === "income" ? "+" : "") + formatMoney(transaction.grosze);
+  // Plus zostaje tylko na liście karty Zarobki; w Bilansie kwoty są bez znaku.
+  const amountText = (kind === "income" && showCategory ? "+" : "") + formatMoney(transaction.grosze);
   const amount = element("span", "tx-amount", amountText);
   amount.classList.toggle("income", kind === "income");
   amount.classList.toggle("savings", kind === "savings");
@@ -1127,7 +1129,7 @@ function periodLabel() {
 // Bilans okresu: zarobki minus wydatki i wpłaty, a pasek pokazuje, na co poszły zarobki.
 function renderBalance(incomeTotal, expenseTotal, savedTotal) {
   const net = incomeTotal - expenseTotal - savedTotal;
-  const sign = net > 0 ? "+" : net < 0 ? "−" : "";
+  const sign = net < 0 ? "−" : "";
   $("total-label").textContent = t("balanceLabel", { period: periodLabel() });
   $("total-amount").textContent = sign + formatNumber(Math.abs(net));
 
@@ -1143,8 +1145,7 @@ function renderBalance(incomeTotal, expenseTotal, savedTotal) {
   $("balance-saved").style.width = `${(savedTotal / base) * 100}%`;
 
   // Kafelki liczą tylko kategorie zaznaczone w filtrze; bilans wyżej zawsze obejmuje wszystko.
-  const income = selectedTotal("income");
-  $("income-total").textContent = (income > 0 ? "+" : "") + formatNumber(income);
+  $("income-total").textContent = formatNumber(selectedTotal("income"));
   $("expense-total").textContent = formatNumber(selectedTotal("expense"));
   $("savings-sum").textContent = formatNumber(selectedTotal("savings"));
   for (const kind of ["income", "expense", "savings"]) {
@@ -1220,7 +1221,7 @@ function categoryCard(group, periodTotal, kind) {
   );
   const head = element("span", "category-head");
   const isIncome = kind === "income" && !isEmpty;
-  const sum = element("span", "category-sum", (isIncome ? "+" : "") + formatMoney(group.total));
+  const sum = element("span", "category-sum", formatMoney(group.total));
   sum.classList.toggle("income", isIncome);
   sum.classList.toggle("savings", kind === "savings" && !isEmpty);
   head.append(avatar(group.name), info, sum);
@@ -1238,10 +1239,48 @@ function categoryCard(group, periodTotal, kind) {
 
   if (expanded) {
     const details = element("div", "category-transactions");
-    for (const transaction of group.transactions) details.append(transactionRow(transaction, false, kind));
+    if (summaryMode === "year") appendYearMonths(details, group, kind);
+    else for (const transaction of group.transactions) details.append(transactionRow(transaction, false, kind));
     card.append(details);
   }
   return card;
+}
+
+// Widok roczny: najpierw miesiące, a wydatki dopiero po stuknięciu w miesiąc.
+function appendYearMonths(details, group, kind) {
+  const months = new Map();
+  for (const transaction of group.transactions) {
+    const month = transaction.date.slice(0, 7);
+    if (!months.has(month)) months.set(month, []);
+    months.get(month).push(transaction);
+  }
+  for (const [month, transactions] of [...months.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
+    const key = `${kind}|${group.name}|${month}`;
+    const expanded = expandedMonths.has(key);
+    const row = element("button", "month-row");
+    row.type = "button";
+    row.setAttribute("aria-expanded", String(expanded));
+    const info = element("span", "category-info");
+    info.append(
+      element("span", "month-name", MONTHS[Number(month.slice(5)) - 1]),
+      element("span", "category-count", countLabel(transactions.length, kind)),
+    );
+    const sum = element("span", "month-sum", formatMoney(sumOf(transactions)));
+    sum.classList.toggle("income", kind === "income");
+    sum.classList.toggle("savings", kind === "savings");
+    row.append(info, sum);
+    row.addEventListener("click", () => {
+      if (expanded) expandedMonths.delete(key);
+      else expandedMonths.add(key);
+      renderSummary();
+    });
+    details.append(row);
+    if (expanded) {
+      const entries = element("div", "month-transactions");
+      for (const transaction of transactions) entries.append(transactionRow(transaction, false, kind));
+      details.append(entries);
+    }
+  }
 }
 
 // --- Filtr kategorii ---
@@ -1613,6 +1652,7 @@ function replaceAllData(next) {
     hiddenCategories[kind].clear();
     expandedCategories[kind].clear();
   }
+  expandedMonths.clear();
   $("note").value = "";
 }
 

@@ -53,7 +53,7 @@ function formatTick(value) {
 }
 
 function signedMoney(grosze) {
-  const sign = grosze > 0 ? "+" : grosze < 0 ? "−" : "";
+  const sign = grosze < 0 ? "−" : "";
   return sign + formatMoney(Math.abs(grosze));
 }
 
