@@ -228,9 +228,6 @@
   <form id="budget-sheet" class="sheet" data-mode="savings" novalidate hidden>
     <h2 class="sheet-title" data-i18n="pots.startTitle"></h2>
     <p class="sheet-text" data-i18n="pots.startText"></p>
-    <div class="edit-date-row">
-      <button id="budget-date" type="button" class="date-pill" aria-haspopup="dialog" data-i18n-aria="changeDate"><span id="budget-date-value"></span></button>
-    </div>
     <div class="amount-line pot-amount-line">
       <span id="budget-amount-sizer" class="amount-sizer" data-value="0,00">
         <input id="budget-amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
@@ -250,12 +247,15 @@
     <div class="note-block pot-new-name">
       <input id="pot-new-name" type="text" maxlength="30" autocomplete="off" autocapitalize="sentences" data-i18n-placeholder="pots.namePlaceholder" data-i18n-aria="name">
     </div>
-    <p class="sheet-label" data-i18n="pots.startAmount"></p>
-    <div class="amount-line pot-amount-line">
-      <span id="pot-new-start-sizer" class="amount-sizer" data-value="0,00">
-        <input id="pot-new-start" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
-      </span>
-      <span class="currency" aria-hidden="true">PLN</span>
+    <button id="pot-new-has-money" type="button" class="btn-link pot-has-money" data-i18n="pots.hasMoney"></button>
+    <div id="pot-new-start-block" hidden>
+      <p class="sheet-label" data-i18n="pots.startAmount"></p>
+      <div class="amount-line pot-amount-line">
+        <span id="pot-new-start-sizer" class="amount-sizer" data-value="0,00">
+          <input id="pot-new-start" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
+        </span>
+        <span class="currency" aria-hidden="true">PLN</span>
+      </div>
     </div>
     <p id="pot-new-error" class="error" role="alert" hidden></p>
     <button type="submit" class="btn-primary ready" data-i18n="add"></button>

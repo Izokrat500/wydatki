@@ -1,7 +1,6 @@
 // --- Skarbonki: pieniądze przydzielone do kategorii; przydział nie zmienia Bilansu ---
 
 let savingsView = "pots"; // co pokazuje karta Odkładam: "pots" albo "entries"
-let budgetStartDraft = null; // data wybrana w panelu startu
 let openPotId = null; // skarbonka otwarta w panelu szczegółów
 
 function formatSignedMoney(grosze) {
@@ -64,15 +63,33 @@ function potLeft(pot) {
   return potAdded(pot) - potSpent(pot);
 }
 
-// Wolne = wszystkie pieniądze od startu minus to, co jeszcze leży w skarbonkach.
+function positiveInPots() {
+  return data.pots.reduce((sum, pot) => sum + Math.max(potLeft(pot), 0), 0);
+}
+
+function potStartAmounts() {
+  return data.pots.reduce((sum, pot) => sum + pot.start, 0);
+}
+
+// Start to zdjęcie stanu z chwili zapisu: kwota wpisana przez użytkownika już uwzględnia
+// wszystko, co było wcześniej, więc liczą się tylko wpisy dodane później.
+// Wpis dodany później, ale z datą sprzed startu, też jest już w tej kwocie.
+function countsForBudget(entry) {
+  const { start, createdAt } = data.budget;
+  if (entry.date < start) return false;
+  return createdAt ? entry.id > createdAt : true; // starty zapisane przed tą zmianą nie mają createdAt
+}
+
+// Wolne = kwota ze startu + zmiany od startu - to, co od startu przybyło w skarbonkach.
 // Skarbonka na minusie to pieniądze dopłacone z głównego konta, więc liczy się jako 0.
 function budgetNumbers() {
   if (!data.budget) return null;
-  const since = (list) => list.filter((entry) => entry.date >= data.budget.start).reduce((sum, entry) => sum + entry.grosze, 0);
-  const startAmounts = data.pots.reduce((sum, pot) => sum + pot.start, 0);
-  const total = data.budget.opening + startAmounts + since(data.incomes) - since(data.transactions) - since(data.savings);
-  const inPots = data.pots.reduce((sum, pot) => sum + Math.max(potLeft(pot), 0), 0);
-  return { total, inPots, free: total - inPots };
+  const { opening, potsBase = 0, startsBase = 0 } = data.budget;
+  const since = (list) => list.filter(countsForBudget).reduce((sum, entry) => sum + entry.grosze, 0);
+  const flows = since(data.incomes) - since(data.transactions) - since(data.savings);
+  const inPots = positiveInPots();
+  const free = opening + flows + (potStartAmounts() - startsBase) - (inPots - potsBase);
+  return { total: free + inPots, inPots, free };
 }
 
 // --- Widok karty Odkładam ---
@@ -141,16 +158,11 @@ function renderPotHint() {
 
 // --- Start skarbonek ---
 
-function renderBudgetDate() {
-  $("budget-date-value").textContent = formatDate(budgetStartDraft);
-}
-
 function openBudgetSheet() {
-  budgetStartDraft = data.budget ? data.budget.start : todayString();
-  $("budget-amount").value = data.budget ? amountForEditing(data.budget.opening) : "";
+  const numbers = budgetNumbers();
+  $("budget-amount").value = numbers && numbers.free > 0 ? amountForEditing(numbers.free) : "";
   $("budget-error").hidden = true;
   fitAmountField($("budget-amount"), $("budget-amount-sizer"));
-  renderBudgetDate();
   openSheet("budget-sheet", "budget-backdrop");
 }
 
@@ -169,7 +181,13 @@ function saveBudget(event) {
   }
   closeBudgetSheet();
   commitPots(() => {
-    data.budget = { start: budgetStartDraft, opening };
+    data.budget = {
+      start: todayString(),
+      opening,
+      createdAt: Date.now(),
+      potsBase: positiveInPots(),
+      startsBase: potStartAmounts(),
+    };
   });
 }
 
@@ -178,6 +196,8 @@ function saveBudget(event) {
 function openPotNewSheet() {
   $("pot-new-name").value = "";
   $("pot-new-start").value = "";
+  $("pot-new-start-block").hidden = true;
+  $("pot-new-has-money").hidden = false;
   $("pot-new-error").hidden = true;
   fitAmountField($("pot-new-start"), $("pot-new-start-sizer"));
   renderPotNewChips();
@@ -410,6 +430,9 @@ function cleanPotsFromBackup(source) {
   if (source.budget) {
     if (!isValidDate(source.budget.start) || !Number.isSafeInteger(source.budget.opening)) throw new Error("Zły start");
     budget = { start: source.budget.start, opening: source.budget.opening };
+    for (const field of ["createdAt", "potsBase", "startsBase"]) {
+      if (Number.isSafeInteger(source.budget[field])) budget[field] = source.budget[field];
+    }
   }
   return { pots, potTransfers, budget };
 }
@@ -433,12 +456,6 @@ function setupPots() {
   $("budget-backdrop").addEventListener("click", closeBudgetSheet);
   $("budget-sheet").addEventListener("submit", saveBudget);
   $("budget-amount").addEventListener("input", () => fitAmountField($("budget-amount"), $("budget-amount-sizer")));
-  $("budget-date").addEventListener("click", () => {
-    openCalendar(budgetStartDraft, (date) => {
-      budgetStartDraft = date;
-      renderBudgetDate();
-    }, "budget-date", "savings");
-  });
 
   $("pot-new-backdrop").addEventListener("click", closePotNewSheet);
   $("pot-new-sheet").addEventListener("submit", savePotNew);
@@ -447,6 +464,11 @@ function setupPots() {
     renderPotNewChips();
   });
   $("pot-new-start").addEventListener("input", () => fitAmountField($("pot-new-start"), $("pot-new-start-sizer")));
+  $("pot-new-has-money").addEventListener("click", () => {
+    $("pot-new-has-money").hidden = true;
+    $("pot-new-start-block").hidden = false;
+    $("pot-new-start").focus({ preventScroll: true });
+  });
 
   $("split-backdrop").addEventListener("click", closeSplitSheet);
   $("split-sheet").addEventListener("submit", saveSplit);

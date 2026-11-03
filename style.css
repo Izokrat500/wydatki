@@ -770,10 +770,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .balance-free { margin: -6px 0 12px; color: var(--muted); font-size: .82rem; }
 .pot-hint { margin: 0; color: var(--plasma-text); font-size: .85rem; font-weight: 500; text-align: center; }
 .sheet-text { margin: 0 4px 14px; color: var(--muted); font-size: .85rem; line-height: 1.45; text-align: center; }
-.sheet-label { margin: 0 0 2px; color: var(--muted); font-size: .85rem; text-align: center; }
+.sheet-label { margin: 8px 4px 4px; color: var(--muted); font-size: .85rem; line-height: 1.4; text-align: center; }
 .pot-amount-line { margin-bottom: 14px; }
 .pot-amount-line .amount-sizer { font-size: 2.4rem; }
-.pot-new-name { margin-bottom: 12px; }
+.pot-new-name { margin-bottom: 4px; }
+.pot-has-money { display: block; width: 100%; margin-bottom: 8px; font-size: .85rem; font-weight: 500; }
 .split-head { text-align: center; }
 .split-head .total-value strong { font-size: 2.4rem; font-weight: 300; font-variant-numeric: tabular-nums; }
 .split-track { margin: 10px 0 8px; }
