@@ -577,6 +577,18 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 }
 .flow-label { display: block; margin-bottom: 2px; color: #bb9bff; font-size: .75rem; font-weight: 600; white-space: nowrap; }
 .flow-card.savings .flow-label { color: var(--savings-text); }
+/* Kropka: kwota na tym kafelku jest przefiltrowana */
+.flow-card { position: relative; }
+.flow-card.filtered::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+  border-radius: 50%;
+}
 .flow-card.income .flow-label { color: var(--income-text); }
 .flow-card strong {
   display: block;

@@ -1142,12 +1142,20 @@ function renderBalance(incomeTotal, expenseTotal, savedTotal) {
   $("balance-fill").style.width = `${(expenseTotal / base) * 100}%`;
   $("balance-saved").style.width = `${(savedTotal / base) * 100}%`;
 
-  $("income-total").textContent = (incomeTotal > 0 ? "+" : "") + formatNumber(incomeTotal);
-  $("expense-total").textContent = formatNumber(expenseTotal);
-  $("savings-sum").textContent = formatNumber(savedTotal);
+  // Kafelki liczą tylko kategorie zaznaczone w filtrze; bilans wyżej zawsze obejmuje wszystko.
+  const income = selectedTotal("income");
+  $("income-total").textContent = (income > 0 ? "+" : "") + formatNumber(income);
+  $("expense-total").textContent = formatNumber(selectedTotal("expense"));
+  $("savings-sum").textContent = formatNumber(selectedTotal("savings"));
   for (const kind of ["income", "expense", "savings"]) {
     $(`view-${kind}`).setAttribute("aria-pressed", String(summaryView === kind));
+    $(`view-${kind}`).classList.toggle("filtered", hiddenCategories[kind].size > 0);
   }
+}
+
+function selectedTotal(kind) {
+  const hidden = hiddenCategories[kind];
+  return sumOf(transactionsInPeriod(kind).filter((entry) => !hidden.has(entry.category)));
 }
 
 function renderSummary() {
@@ -1174,7 +1182,7 @@ function renderSummary() {
     : t("filter");
   $("filter-open").classList.toggle("active", filtered);
   $("filtered-note").hidden = !filtered;
-  $("filtered-note").textContent = t("selectedSum", { label: text.filterSelected, amount: formatMoney(visibleTotal) });
+  $("filtered-note").textContent = t("selectedSum", { label: text.filterSelected });
 
   const list = $("summary-list");
   list.dataset.mode = view;
