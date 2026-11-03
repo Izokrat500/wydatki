@@ -732,6 +732,117 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 }
 .tabbar button[aria-current="page"] { color: #ffffff; }
 
+/* --- Skarbonki --- */
+.savings-switch { margin: 8px 0 4px; }
+.pots-hero { padding-top: 18px; }
+.pots-empty { margin-top: 24px; padding: 22px 18px; text-align: center; }
+.pots-empty h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.pots-empty p { margin: 0 0 18px; color: var(--muted); font-size: .9rem; line-height: 1.45; }
+.negative { color: var(--error) !important; }
+.pot-card {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  color: inherit;
+  text-align: left;
+  transition: transform .1s;
+}
+.pot-card:active { transform: scale(.985); }
+.pot-head { display: flex; align-items: center; gap: 12px; }
+.pot-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.pot-amounts { flex: none; text-align: right; }
+.pot-left { display: block; font-variant-numeric: tabular-nums; }
+.pot-of { display: block; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.pot-track { display: block; margin-top: 10px; }
+#pots-view .where-fill, .split-track .where-fill { background: var(--plasma); animation: none; transition: width .25s ease-out; }
+.pots-action { display: block; width: 100%; margin-top: 8px; }
+.pots-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: .8rem;
+}
+.pots-foot .btn-link { font-size: .8rem; }
+.balance-free { margin: -6px 0 12px; color: var(--muted); font-size: .82rem; }
+.pot-hint { margin: 0; color: var(--plasma-text); font-size: .85rem; font-weight: 500; text-align: center; }
+.sheet-text { margin: 0 4px 14px; color: var(--muted); font-size: .85rem; line-height: 1.45; text-align: center; }
+.sheet-label { margin: 0 0 2px; color: var(--muted); font-size: .85rem; text-align: center; }
+.pot-amount-line { margin-bottom: 14px; }
+.pot-amount-line .amount-sizer { font-size: 2.4rem; }
+.pot-new-name { margin-bottom: 12px; }
+.split-head { text-align: center; }
+.split-head .total-value strong { font-size: 2.4rem; font-weight: 300; font-variant-numeric: tabular-nums; }
+.split-track { margin: 10px 0 8px; }
+.split-rows { max-height: 38dvh; overflow-y: auto; overscroll-behavior: contain; }
+.split-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.split-name { flex: 1; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.split-field {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  width: 124px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+.split-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  caret-color: var(--plasma-text);
+}
+.split-input::placeholder { color: var(--faint); }
+.split-field:focus-within { box-shadow: 0 0 0 1px var(--plasma-violet); }
+.split-currency { color: var(--faint); font-size: .72rem; font-weight: 600; }
+.split-after {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--line);
+  font-size: .92rem;
+}
+.split-after span { color: var(--muted); }
+.split-note { margin: 10px 4px 0; }
+.pot-detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.pot-history { max-height: 22dvh; overflow-y: auto; overscroll-behavior: contain; }
+.pot-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  border-top: 1px solid var(--line);
+  font-size: .88rem;
+}
+.pot-history-date { flex: 1; color: var(--muted); }
+.pot-history-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pot-history-remove {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: 0;
+  color: var(--faint);
+  font-size: 1.1rem;
+}
+
 /* --- Karta Odkładam: suma ze wszystkich miejsc --- */
 .savings-overview { margin: 24px 0 8px; padding: 16px; border-color: rgb(217 154 28 / .35); }
 .savings-overview .total-value { justify-content: flex-start; margin-bottom: 14px; }

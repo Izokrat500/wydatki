@@ -30,6 +30,39 @@
     <main>
       <!-- Zakładki Wydatki, Zarobki i Odkładam: ten sam ekran, inne dane i kolor -->
       <section id="tab-transakcje" class="tab">
+        <!-- Karta Odkładam: Skarbonki albo Oszczędności -->
+        <div id="savings-switch" class="segmented savings-switch" role="group" hidden>
+          <button id="savings-view-pots" type="button" data-i18n="pots.tab"></button>
+          <button id="savings-view-entries" type="button" data-i18n="pots.savingsTab"></button>
+        </div>
+
+        <div id="pots-view" hidden>
+          <div id="pots-empty" class="card pots-empty">
+            <h2 data-i18n="pots.emptyTitle"></h2>
+            <p data-i18n="pots.emptyText"></p>
+            <button id="pots-start" type="button" class="btn-primary ready" data-i18n="pots.start"></button>
+          </div>
+
+          <div id="pots-main" hidden>
+            <div class="total pots-hero">
+              <span class="total-label" data-i18n="pots.free"></span>
+              <div class="total-value">
+                <strong id="pots-free"></strong>
+                <span class="currency">PLN</span>
+              </div>
+              <p id="pots-sub" class="balance-note"></p>
+            </div>
+            <div id="pots-list"></div>
+            <button id="pots-transfer" type="button" class="btn-primary ready pots-action" data-i18n="pots.transfer"></button>
+            <button id="pots-new" type="button" class="btn-ghost pots-action" data-i18n="pots.new"></button>
+            <p class="pots-foot">
+              <span id="pots-since"></span>
+              <button id="pots-change-start" type="button" class="btn-link" data-i18n="pots.changeStart"></button>
+            </p>
+          </div>
+        </div>
+
+        <div id="entry-content">
         <form id="expense-form" class="entry" novalidate>
           <!-- Ustawienia; kropka świeci, gdy potrzebna jest kopia danych -->
           <button type="button" class="settings-open settings-open-entry" data-i18n-aria="settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
@@ -64,6 +97,7 @@
             <div id="note-block" class="note-block" hidden>
               <input id="note" type="text" maxlength="40" autocomplete="off" autocapitalize="sentences" data-i18n-aria="noteAria">
               <div id="note-suggestions" class="note-suggestions"></div>
+              <p id="pot-hint" class="pot-hint" hidden></p>
             </div>
 
             <button id="save-button" type="submit" class="btn-primary" data-i18n="save"></button>
@@ -84,6 +118,7 @@
 
         <h2 id="recent-title"></h2>
         <div id="recent-list"></div>
+        </div>
       </section>
 
       <!-- Zakładka Bilans -->
@@ -103,6 +138,7 @@
             <span class="currency">PLN</span>
           </div>
           <p id="balance-note" class="balance-note"></p>
+          <p id="balance-free" class="balance-free" hidden></p>
           <!-- Morski pasek to zarobki, plazmowa część to wydatki, a złota to wpłaty -->
           <div id="balance-bar" class="balance-bar" aria-hidden="true"><span id="balance-fill"></span><span id="balance-saved"></span></div>
         </div>
@@ -185,6 +221,92 @@
       <button id="period-year-next" type="button" class="calendar-arrow" data-i18n-aria="nextYear">›</button>
     </div>
     <div id="period-grid" class="period-grid"></div>
+  </div>
+
+  <!-- Start skarbonek -->
+  <div id="budget-backdrop" class="backdrop" hidden></div>
+  <form id="budget-sheet" class="sheet" data-mode="savings" novalidate hidden>
+    <h2 class="sheet-title" data-i18n="pots.startTitle"></h2>
+    <p class="sheet-text" data-i18n="pots.startText"></p>
+    <div class="edit-date-row">
+      <button id="budget-date" type="button" class="date-pill" aria-haspopup="dialog" data-i18n-aria="changeDate"><span id="budget-date-value"></span></button>
+    </div>
+    <div class="amount-line pot-amount-line">
+      <span id="budget-amount-sizer" class="amount-sizer" data-value="0,00">
+        <input id="budget-amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
+      </span>
+      <span class="currency" aria-hidden="true">PLN</span>
+    </div>
+    <p id="budget-error" class="error" role="alert" hidden></p>
+    <button type="submit" class="btn-primary ready" data-i18n="pots.startSave"></button>
+  </form>
+
+  <!-- Nowa skarbonka -->
+  <div id="pot-new-backdrop" class="backdrop" hidden></div>
+  <form id="pot-new-sheet" class="sheet edit-sheet" data-mode="savings" novalidate hidden>
+    <h2 class="sheet-title" data-i18n="pots.newTitle"></h2>
+    <p class="sheet-text" data-i18n="pots.newText"></p>
+    <div id="pot-new-chips" class="edit-categories" role="group" data-i18n-aria="categoryAria"></div>
+    <div class="note-block pot-new-name">
+      <input id="pot-new-name" type="text" maxlength="30" autocomplete="off" autocapitalize="sentences" data-i18n-placeholder="pots.namePlaceholder" data-i18n-aria="name">
+    </div>
+    <p class="sheet-label" data-i18n="pots.startAmount"></p>
+    <div class="amount-line pot-amount-line">
+      <span id="pot-new-start-sizer" class="amount-sizer" data-value="0,00">
+        <input id="pot-new-start" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
+      </span>
+      <span class="currency" aria-hidden="true">PLN</span>
+    </div>
+    <p id="pot-new-error" class="error" role="alert" hidden></p>
+    <button type="submit" class="btn-primary ready" data-i18n="add"></button>
+  </form>
+
+  <!-- Podział zarobków na skarbonki -->
+  <div id="split-backdrop" class="backdrop" hidden></div>
+  <form id="split-sheet" class="sheet edit-sheet" data-mode="savings" novalidate hidden>
+    <h2 class="sheet-title" data-i18n="pots.transfer"></h2>
+    <div class="split-head">
+      <span class="total-label" data-i18n="pots.free"></span>
+      <div class="total-value">
+        <strong id="split-free"></strong>
+        <span class="currency">PLN</span>
+      </div>
+    </div>
+    <div class="where-track split-track"><span id="split-fill" class="where-fill"></span></div>
+    <div id="split-rows" class="split-rows"></div>
+    <div class="split-after">
+      <span data-i18n="pots.afterSplit"></span>
+      <strong id="split-after"></strong>
+    </div>
+    <p id="split-error" class="error" role="alert" hidden></p>
+    <button id="split-save" type="submit" class="btn-primary" data-i18n="save"></button>
+    <p class="sheet-text split-note" data-i18n="pots.splitNote"></p>
+  </form>
+
+  <!-- Szczegóły skarbonki -->
+  <div id="pot-detail-backdrop" class="backdrop" hidden></div>
+  <div id="pot-detail-sheet" class="sheet edit-sheet" data-mode="savings" role="dialog" aria-modal="true" aria-labelledby="pot-detail-title" hidden>
+    <h2 id="pot-detail-title" class="sheet-title"></h2>
+    <div class="split-head">
+      <div class="total-value">
+        <strong id="pot-detail-left"></strong>
+        <span class="currency">PLN</span>
+      </div>
+      <p id="pot-detail-stats" class="balance-note"></p>
+    </div>
+    <div class="amount-line pot-amount-line">
+      <span id="pot-detail-sizer" class="amount-sizer" data-value="0,00">
+        <input id="pot-detail-amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
+      </span>
+      <span class="currency" aria-hidden="true">PLN</span>
+    </div>
+    <p id="pot-detail-error" class="error" role="alert" hidden></p>
+    <div class="pot-detail-actions">
+      <button id="pot-detail-add" type="button" class="btn-primary ready" data-i18n="pots.addMoney"></button>
+      <button id="pot-detail-take" type="button" class="btn-ghost" data-i18n="pots.takeMoney"></button>
+    </div>
+    <div id="pot-detail-history" class="pot-history"></div>
+    <button id="pot-detail-delete" type="button" class="edit-delete" data-i18n="pots.delete"></button>
   </div>
 
   <!-- Panel edycji wpisu -->
@@ -323,6 +445,7 @@
   <div id="chart-tooltip" class="chart-tooltip" role="status" hidden></div>
 
   <script src="i18n.js"></script>
+  <script src="pots.js"></script>
   <script src="app.js"></script>
   <script src="charts.js"></script>
 </body>

@@ -89,6 +89,9 @@ function normalizeData(data) {
   data.incomes = data.incomes || [];
   data.savingsCategories = data.savingsCategories || [...DEFAULT_SAVINGS_CATEGORIES];
   data.savings = data.savings || [];
+  data.pots = data.pots || [];
+  data.potTransfers = data.potTransfers || [];
+  data.budget = data.budget || null;
   data.icons = data.icons || {};
   for (const transaction of [...data.transactions, ...data.incomes, ...data.savings]) {
     if (transaction.note) transaction.note = capitalizeFirst(transaction.note);
@@ -264,6 +267,7 @@ function showTab(name) {
   setCategoryPanel(false);
   window.scrollTo(0, 0);
   if (ENTRY_TABS[name]) setEntryKind(ENTRY_TABS[name]);
+  updateSavingsView();
   if (name === "podsumowanie") renderSummary();
   if (name === "wykresy") renderCharts();
 }
@@ -318,6 +322,7 @@ function renderCategories() {
   for (const name of ledger(entryKind).categories) box.append(categoryItem(name));
   $("note-block").hidden = !selectedCategory;
   renderNoteSuggestions();
+  renderPotHint();
   updateSaveButton();
 }
 
@@ -554,6 +559,12 @@ function transactionsIn(name, kind = entryKind) {
 }
 
 function removeCategoryWithAnimation(item, name) {
+  // Kategoria skarbonki musi zostać, bo od niej zależy stan skarbonki.
+  if (entryKind === "expense" && potFor(name)) {
+    closeItem(item);
+    showToast(t("pots.categoryHasPot", { name: displayName(name) }));
+    return;
+  }
   // Wpisów z "Inne" nie ma już gdzie przenieść.
   if (name === FALLBACK_CATEGORY && transactionsIn(name).length > 0) {
     closeItem(item);
@@ -797,6 +808,7 @@ function fitAmountField(input, sizer) {
 
 function updateAmountField() {
   fitAmountField($("amount"), $("amount-sizer"));
+  renderPotHint();
   updateSaveButton();
 }
 
@@ -1003,6 +1015,7 @@ function renderSavingsOverview() {
 
 function renderRecent() {
   renderSavingsOverview();
+  renderPots();
   const list = $("recent-list");
   list.replaceChildren();
   const recent = [...ledger(entryKind).transactions].sort(sortNewestFirst).slice(0, RECENT_LIMIT);
@@ -1138,6 +1151,9 @@ function renderBalance(incomeTotal, expenseTotal, savedTotal) {
   else if (net < 0) note = t(savedTotal > 0 ? "balance.overSaved" : "balance.over", { amount: formatMoney(-net) });
   else if (incomeTotal > 0) note = t("balance.left", { percent: Math.round((net / incomeTotal) * 100) });
   $("balance-note").textContent = note;
+  const budget = budgetNumbers();
+  $("balance-free").hidden = !budget;
+  if (budget) $("balance-free").textContent = t("pots.balanceLine", { free: formatSignedMoney(budget.free), inPots: formatMoney(budget.inPots) });
 
   $("balance-bar").hidden = incomeTotal === 0;
   const base = Math.max(incomeTotal, expenseTotal + savedTotal, 1);
@@ -1617,6 +1633,7 @@ function parseBackup(text) {
         ? cleanCategories(source.savingsCategories, savings)
         : undefined,
       savings,
+      ...cleanPotsFromBackup(source),
       icons: Object.fromEntries(Object.entries(icons).filter(([, icon]) => typeof icon === "string")),
     }),
   };
@@ -1938,6 +1955,7 @@ document.addEventListener("keydown", (event) => {
     }
     closeFilter();
     closeSettings();
+    closePotSheets();
     setCategoryPanel(false);
     closeCategorySheet();
     closePeriodSheet();
@@ -1947,6 +1965,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 applyStaticTexts();
+setupPots();
 updateDateLabel();
 renderEntryTexts();
 renderCategories();
