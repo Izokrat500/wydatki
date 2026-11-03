@@ -48,7 +48,8 @@ function niceMax(value) {
 
 function formatTick(value) {
   if (value < 1000) return String(value);
-  return `${String(value / 1000).replace(".", ",")} tys.`;
+  const thousands = String(value / 1000);
+  return t("thousands", { value: language === "pl" ? thousands.replace(".", ",") : thousands });
 }
 
 function signedMoney(grosze) {
@@ -155,15 +156,20 @@ function renderFlowChart() {
       date,
       income: sumOf(transactionsInMonth("income", key)),
       expense: sumOf(transactionsInMonth("expense", key)),
+      savings: sumOf(transactionsInMonth("savings", key)),
     });
   }
 
-  const totalIncome = months.reduce((sum, m) => sum + m.income, 0);
-  const totalExpense = months.reduce((sum, m) => sum + m.expense, 0);
-  const hasData = totalIncome + totalExpense > 0;
-  $("flow-headline").textContent = hasData
-    ? `${isYear ? `Bilans ${summaryYear}` : `Bilans z ${CHART_MONTHS_BACK} miesięcy`}: ${signedMoney(totalIncome - totalExpense)}`
-    : "Dodaj wpływy i wydatki, a pojawi się tu ich porównanie";
+  const total = (field) => months.reduce((sum, m) => sum + m[field], 0);
+  const totalBalance = total("income") - total("expense") - total("savings");
+  const hasData = total("income") + total("expense") + total("savings") > 0;
+  const hasSavings = total("savings") > 0;
+  const balanceText = signedMoney(totalBalance);
+  $("flow-headline").textContent = !hasData
+    ? t("chart.flowEmpty")
+    : isYear
+      ? t("chart.balanceYear", { year: summaryYear, amount: balanceText })
+      : t("chart.balanceMonths", { count: CHART_MONTHS_BACK, amount: balanceText });
   $("flow-legend").hidden = !hasData;
   $("flow-details").hidden = !hasData;
   if (!hasData) {
@@ -171,17 +177,22 @@ function renderFlowChart() {
     return;
   }
 
-  renderLegend("flow-legend", [
-    { label: "Wpływy", className: "key-income" },
-    { label: "Wydatki", className: "key-expense" },
-  ]);
+  // Trzecia seria pojawia się dopiero, gdy są jakieś wpłaty.
+  const series = [
+    { field: "income", label: t("legend.income"), bar: "bar-income", key: "key-income" },
+    { field: "expense", label: t("legend.expense"), bar: "bar-expense", key: "key-expense" },
+  ];
+  if (hasSavings) series.push({ field: "savings", label: t("legend.savings"), bar: "bar-savings", key: "key-savings" });
+  renderLegend("flow-legend", series.map(({ label, key }) => ({ label, className: key })));
 
   const plot = plotArea("flow-chart", { left: 46, right: 2, top: 10, bottom: 24 });
-  const largest = Math.max(...months.map((m) => Math.max(m.income, m.expense))) / 100;
+  const largest = Math.max(...months.map((m) => Math.max(...series.map(({ field }) => m[field])))) / 100;
   const maxValue = niceMax(largest);
   const y = drawGrid(plot, maxValue);
   const band = (plot.right - plot.left) / months.length;
-  const barWidth = Math.min(16, (band - (isYear ? 5 : 14)) / 2);
+  const gaps = (series.length - 1) * 2;
+  const barWidth = Math.min(16, (band - (isYear ? 5 : 14) - gaps) / series.length);
+  const groupWidth = barWidth * series.length + gaps;
 
   months.forEach((month, index) => {
     const center = plot.left + band * (index + 0.5);
@@ -195,8 +206,10 @@ function renderFlowChart() {
       class: "chart-band-highlight",
     }, group);
 
-    drawColumn(group, center - barWidth - 1, barWidth, month.income / 100, y, plot.bottom, "bar-income");
-    drawColumn(group, center + 1, barWidth, month.expense / 100, y, plot.bottom, "bar-expense");
+    series.forEach(({ field, bar }, position) => {
+      const x = center - groupWidth / 2 + position * (barWidth + 2);
+      drawColumn(group, x, barWidth, month[field] / 100, y, plot.bottom, bar);
+    });
 
     const selected = !isYear && index === months.length - 1;
     const label = svgElement("text", {
@@ -208,11 +221,13 @@ function renderFlowChart() {
     label.textContent = MONTHS_SHORT[month.date.getMonth()];
 
     const title = `${MONTHS[month.date.getMonth()]} ${month.date.getFullYear()}`;
-    const rows = [
-      { value: formatMoney(month.income), label: "wpływy", className: "key-income" },
-      { value: formatMoney(month.expense), label: "wydatki", className: "key-expense" },
-      { value: signedMoney(month.income - month.expense), label: "bilans" },
-    ];
+    const balance = month.income - month.expense - month.savings;
+    const rows = series.map(({ field, key }) => ({
+      value: formatMoney(month[field]),
+      label: t(`tooltip.${field}`),
+      className: key,
+    }));
+    rows.push({ value: signedMoney(balance), label: t("tooltip.balance") });
     // Cały pas miesiąca reaguje na palec, nie tylko wąski słupek.
     const hit = svgElement("rect", {
       x: plot.left + band * index,
@@ -223,7 +238,7 @@ function renderFlowChart() {
       tabindex: 0,
       role: "img",
       "data-chart-hit": "true",
-      "aria-label": `${title}: wpływy ${formatMoney(month.income)}, wydatki ${formatMoney(month.expense)}`,
+      "aria-label": `${title}: ${rows.map((row) => `${row.label} ${row.value}`).join(", ")}`,
     }, group);
     const show = (event) => {
       showChartTooltip(title, rows, event.clientX, event.clientY);
@@ -240,11 +255,11 @@ function renderFlowChart() {
     hit.addEventListener("blur", hideChartTooltip);
   });
 
-  renderChartTable("flow-table", ["Miesiąc", "Wpływy", "Wydatki", "Bilans"], months.map((m) => [
+  const headers = [t("table.month"), ...series.map(({ label }) => label), t("table.balance")];
+  renderChartTable("flow-table", headers, months.map((m) => [
     `${MONTHS_SHORT[m.date.getMonth()]} ${m.date.getFullYear()}`,
-    formatNumber(m.income),
-    formatNumber(m.expense),
-    signedMoney(m.income - m.expense).replace(" PLN", ""),
+    ...series.map(({ field }) => formatNumber(m[field])),
+    signedMoney(m.income - m.expense - m.savings).replace(" PLN", ""),
   ]));
 }
 
@@ -298,11 +313,11 @@ function paceSeries() {
       previousName: String(summaryYear - 1),
       ticks: [1, 4, 7, 10, YEAR_MONTHS],
       tickLabel: (month) => MONTHS_SHORT[month - 1],
-      pointTitle: (month) => `Do końca: ${MONTHS[month - 1].toLowerCase()}`,
-      tableHeader: "Do końca",
+      pointTitle: (month) => t("pace.toEndOf", { month: language === "pl" ? MONTHS[month - 1].toLowerCase() : MONTHS[month - 1] }),
+      tableHeader: t("pace.tableToEnd"),
       tablePoints: Array.from({ length: YEAR_MONTHS }, (_, i) => i + 1),
       tableLabel: (month) => MONTHS_SHORT[month - 1],
-      noData: `Brak wydatków w latach ${summaryYear - 1} i ${summaryYear}`,
+      noData: t("pace.noDataYear", { previous: summaryYear - 1, year: summaryYear }),
     };
   }
   const month = selectedMonth();
@@ -326,26 +341,26 @@ function paceSeries() {
     previousName: MONTHS[previousMonth.getMonth()],
     ticks: [1, 10, 20, lastX],
     tickLabel: (day) => String(day),
-    pointTitle: (day) => `Do ${day}. dnia miesiąca`,
-    tableHeader: "Do dnia",
+    pointTitle: (day) => t("pace.toDay", { day }),
+    tableHeader: t("pace.tableToDay"),
     tablePoints,
     tableLabel: (day) => String(day),
-    noData: "Brak wydatków w tym i poprzednim miesiącu",
+    noData: t("pace.noDataMonth"),
   };
 }
 
 function paceHeadline(current, previous, ongoing, unit) {
-  const verb = ongoing ? "są" : "były";
-  const when = ongoing ? `niż o tej porze ${unit} temu` : `niż ${unit} wcześniej`;
-  const inPeriod = unit === "rok" ? "W tym roku" : "W tym miesiącu";
-  if (previous === 0) return `${ongoing ? `${inPeriod} wydano już` : `${inPeriod} wydano`} ${formatMoney(current)}`;
-  if (current === previous) return `Wydatki ${verb} takie same ${when}`;
+  const period = unit === "rok" ? "Year" : "Month";
+  const verb = t(ongoing ? "pace.verbNow" : "pace.verbPast");
+  const when = t(`pace.when${ongoing ? "Ongoing" : ""}${period}`);
+  if (previous === 0) return t(`pace.spent${ongoing ? "Ongoing" : ""}${period}`, { amount: formatMoney(current) });
+  if (current === previous) return t("pace.same", { verb, when });
   if (current >= previous * 2) {
-    const times = String(Math.round((current / previous) * 10) / 10).replace(".", ",");
-    return `Wydatki ${verb} ${times} razy wyższe ${when}`;
+    const value = String(Math.round((current / previous) * 10) / 10);
+    return t("pace.times", { verb, when, times: language === "pl" ? value.replace(".", ",") : value });
   }
   const percent = Math.max(1, Math.round((Math.abs(current - previous) / previous) * 100));
-  return `Wydatki ${verb} o ${percent}% ${current < previous ? "niższe" : "wyższe"} ${when}`;
+  return t(current < previous ? "pace.lower" : "pace.higher", { verb, when, percent });
 }
 
 function renderPaceChart() {
@@ -423,7 +438,7 @@ function renderPaceChart() {
     tabindex: 0,
     role: "img",
     "data-chart-hit": "true",
-    "aria-label": `${$("pace-headline").textContent}. Strzałki w lewo i w prawo zmieniają punkt na wykresie.`,
+    "aria-label": t("pace.aria", { headline: $("pace-headline").textContent }),
   }, plot.svg);
 
   let focusedPoint = lastPoint;
@@ -499,7 +514,7 @@ function renderWhereChart() {
   box.replaceChildren();
 
   if (total === 0) {
-    $("where-headline").textContent = "Brak wydatków w tym okresie";
+    $("where-headline").textContent = t("where.empty");
     return;
   }
 
@@ -512,7 +527,7 @@ function renderWhereChart() {
   const rest = ranked.slice(CHART_TOP_CATEGORIES).reduce((sum, [, value]) => sum + value, 0);
 
   const share = (value) => Math.round((value / total) * 100);
-  $("where-headline").textContent = `Najwięcej idzie na: ${top[0][0]} (${share(top[0][1])}%)`;
+  $("where-headline").textContent = t("where.top", { name: displayName(top[0][0]), percent: share(top[0][1]) });
 
   const addRow = (name, value, isRest) => {
     const row = element("div", "where-row");
@@ -520,7 +535,7 @@ function renderWhereChart() {
     if (isRest) head.append(element("span", "avatar", "…"));
     else head.append(avatar(name));
     const percent = element("span", "where-percent", `${share(value)}%`);
-    head.append(element("span", "where-name", name), percent, element("span", "where-value", formatMoney(value)));
+    head.append(element("span", "where-name", displayName(name)), percent, element("span", "where-value", formatMoney(value)));
     const track = element("div", "where-track");
     const fill = element("span", isRest ? "where-fill where-fill-rest" : "where-fill");
     fill.style.width = `${Math.max(1, (value / total) * 100)}%`;
@@ -529,7 +544,7 @@ function renderWhereChart() {
     box.append(row);
   };
   for (const [name, value] of top) addRow(name, value, false);
-  if (rest > 0) addRow("Pozostałe", rest, true);
+  if (rest > 0) addRow(t("where.rest"), rest, true);
 }
 
 // --- Całość zakładki ---
@@ -538,7 +553,7 @@ function renderCharts() {
   hideChartTooltip();
   renderPeriodControls();
   $("charts-title").textContent = summaryMode === "year"
-    ? `Rok ${summaryYear}`
+    ? t("yearLabel", { year: summaryYear })
     : `${MONTHS[summaryMonth]} ${summaryYear}`;
   renderFlowChart();
   renderPaceChart();

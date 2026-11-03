@@ -3,9 +3,7 @@
 const STORAGE_KEY = "wydatki.v1";
 const DEFAULT_CATEGORIES = ["Jedzenie", "Rozrywka", "Transport", "Ubrania", "Pielęgnacja", "Edukacja", "Inne", "Subskrypcje"];
 const DEFAULT_INCOME_CATEGORIES = ["Pensja", "Premia", "Zlecenie", "Zwrot", "Sprzedaż", "Inne"];
-const MONTHS = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec",
-  "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
-const MONTHS_SHORT = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+const DEFAULT_SAVINGS_CATEGORIES = ["Trading 212", "Konto oszczędnościowe", "Inne"];
 const RECENT_LIMIT = 20;
 const NOTE_SUGGESTIONS_LIMIT = 4;
 const CALENDAR_SWIPE_PX = 40;
@@ -29,43 +27,22 @@ const BACKUP_FIRST_AFTER_ENTRIES = 10; // przy tylu wpisach przypominamy o pierw
 const BACKUP_REMINDER_EVERY_DAYS = 7; // nie przypominamy częściej niż co tydzień
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Teksty zależne od tego, czy dodajemy wydatek, czy wpływ.
-const KIND_TEXT = {
-  expense: {
-    categoryPlaceholder: "Kategoria",
-    pickCategory: "Wybierz kategorię.",
-    newCategory: "+ Nowa kategoria",
-    sheetTitle: "Nowa kategoria",
-    notePlaceholder: "Co to było? (opcjonalnie)",
-    recent: "Ostatnie wydatki",
-    empty: "Nie masz jeszcze żadnych wydatków.",
-    one: "wydatek",
-    filterTitle: "Kategorie",
-    filterSelected: "Wybrane kategorie",
-    filterNone: "Nie wybrano żadnej kategorii.",
-  },
-  income: {
-    categoryPlaceholder: "Źródło",
-    pickCategory: "Wybierz źródło.",
-    newCategory: "+ Nowe źródło",
-    sheetTitle: "Nowe źródło",
-    notePlaceholder: "Skąd te pieniądze? (opcjonalnie)",
-    recent: "Ostatnie wpływy",
-    empty: "Nie masz jeszcze żadnych wpływów.",
-    one: "wpływ",
-    filterTitle: "Źródła",
-    filterSelected: "Wybrane źródła",
-    filterNone: "Nie wybrano żadnego źródła.",
-  },
-};
-
 const ICON_CHOICES = {
   expense: ["🍔", "🛒", "☕", "🍺", "🚗", "⛽", "🏠", "💡", "📱", "🎬", "📺", "✈️", "👕", "🧴", "💊", "🎓", "🏋️", "✨"],
   income: ["💼", "💰", "🎁", "🧾", "📈", "🏦", "🏷️", "🤝", "💸", "🏠", "🎓", "✨"],
+  savings: ["📈", "🏦", "💰", "🐷", "🏠", "🚗", "✈️", "🎓", "🛟", "💎", "🎯", "✨"],
 };
 
 // Ikona dobierana po początku słowa w nazwie, np. "kawa" daje ☕.
 const ICON_RULES = [
+  [/trading|etf|xtb|revolut/, "📈"],
+  [/konto|account|lokat|savings/, "🏦"],
+  [/food|grocer/, "🛒"],
+  [/coffee/, "☕"],
+  [/fuel/, "⛽"],
+  [/rent|home/, "🏠"],
+  [/clothes/, "👕"],
+  [/salary|work|job/, "💼"],
   [/jedzen|spożyw|zakup|lidl|biedron/, "🛒"],
   [/restaur|obiad|pizza|burger|fast/, "🍔"],
   [/kaw|cafe/, "☕"],
@@ -110,8 +87,10 @@ function capitalizeInput(input) {
 function normalizeData(data) {
   data.incomeCategories = data.incomeCategories || [...DEFAULT_INCOME_CATEGORIES];
   data.incomes = data.incomes || [];
+  data.savingsCategories = data.savingsCategories || [...DEFAULT_SAVINGS_CATEGORIES];
+  data.savings = data.savings || [];
   data.icons = data.icons || {};
-  for (const transaction of [...data.transactions, ...data.incomes]) {
+  for (const transaction of [...data.transactions, ...data.incomes, ...data.savings]) {
     if (transaction.note) transaction.note = capitalizeFirst(transaction.note);
   }
   return data;
@@ -145,9 +124,13 @@ function saveData() {
 const data = loadData();
 
 function ledger(kind) {
-  return kind === "income"
-    ? { categories: data.incomeCategories, transactions: data.incomes }
-    : { categories: data.categories, transactions: data.transactions };
+  if (kind === "income") return { categories: data.incomeCategories, transactions: data.incomes };
+  if (kind === "savings") return { categories: data.savingsCategories, transactions: data.savings };
+  return { categories: data.categories, transactions: data.transactions };
+}
+
+function allEntries() {
+  return [...data.transactions, ...data.incomes, ...data.savings];
 }
 
 // --- Stan ekranu ---
@@ -156,7 +139,7 @@ const now = new Date();
 let activeTab = "wydatki";
 let entryKind = "expense"; // co dodajemy na ekranie: wydatek albo wpływ
 let selectedCategory = null;
-const drafts = { expense: null, income: null }; // niedokończony wpis każdej zakładki
+const drafts = { expense: null, income: null, savings: null }; // niedokończony wpis każdej zakładki
 let newCategoryIcon = null;
 let newCategoryIconPicked = false;
 let selectedDate = dateToString(now);
@@ -173,8 +156,8 @@ let summaryMonth = now.getMonth();
 let summaryYear = now.getFullYear();
 let periodSheetYear = summaryYear; // rok oglądany w panelu wyboru miesiąca
 let summaryView = "expense"; // którą listę pokazuje podsumowanie
-const hiddenCategories = { expense: new Set(), income: new Set() }; // odznaczone w filtrze
-const expandedCategories = { expense: new Set(), income: new Set() }; // rozwinięte w podsumowaniu
+const hiddenCategories = { expense: new Set(), income: new Set(), savings: new Set() }; // odznaczone w filtrze
+const expandedCategories = { expense: new Set(), income: new Set(), savings: new Set() }; // rozwinięte w podsumowaniu
 let okMessageTimer = null;
 let toastTimer = null;
 let toastUndo = null;
@@ -204,7 +187,7 @@ function parseAmount(text) {
 }
 
 function formatNumber(grosze) {
-  return (grosze / 100).toLocaleString("pl-PL", {
+  return (grosze / 100).toLocaleString(numberLocale(), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -221,10 +204,10 @@ function formatDate(dateString) {
 }
 
 function dayLabel(dateString) {
-  if (dateString === todayString()) return "Dziś";
+  if (dateString === todayString()) return t("today");
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  if (dateString === dateToString(yesterday)) return "Wczoraj";
+  if (dateString === dateToString(yesterday)) return t("yesterday");
   return formatDate(dateString);
 }
 
@@ -244,16 +227,6 @@ function avatar(name) {
   return el;
 }
 
-function countLabel(n, kind) {
-  const forms = kind === "income" ? ["wpływ", "wpływy", "wpływów"] : ["wydatek", "wydatki", "wydatków"];
-  if (n === 0) return `brak ${forms[2]}`;
-  if (n === 1) return `1 ${forms[0]}`;
-  const last = n % 10;
-  const lastTwo = n % 100;
-  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return `${n} ${forms[1]}`;
-  return `${n} ${forms[2]}`;
-}
-
 function sortNewestFirst(a, b) {
   return b.date.localeCompare(a.date) || b.id - a.id;
 }
@@ -271,10 +244,11 @@ function element(tag, className, text) {
 
 // --- Zakładki ---
 
-const TABS = ["wydatki", "wplywy", "podsumowanie", "wykresy"];
+const TABS = ["wydatki", "wplywy", "odkladam", "podsumowanie", "wykresy"];
+const ENTRY_TABS = { wydatki: "expense", wplywy: "income", odkladam: "savings" };
 
 function showTab(name) {
-  $("tab-transakcje").hidden = name !== "wydatki" && name !== "wplywy";
+  $("tab-transakcje").hidden = !ENTRY_TABS[name];
   $("tab-podsumowanie").hidden = name !== "podsumowanie";
   $("tab-wykresy").hidden = name !== "wykresy";
   $("filter-open").hidden = name !== "podsumowanie";
@@ -285,11 +259,10 @@ function showTab(name) {
   }
   activeTab = name;
   updateTabIndicator();
-  document.body.dataset.mode = name === "wplywy" ? "income" : "expense";
+  document.body.dataset.mode = ENTRY_TABS[name] || "expense";
   setCategoryPanel(false);
   window.scrollTo(0, 0);
-  if (name === "wydatki") setEntryKind("expense");
-  if (name === "wplywy") setEntryKind("income");
+  if (ENTRY_TABS[name]) setEntryKind(ENTRY_TABS[name]);
   if (name === "podsumowanie") renderSummary();
   if (name === "wykresy") renderCharts();
 }
@@ -326,7 +299,7 @@ function setEntryKind(kind) {
 }
 
 function renderEntryTexts() {
-  const text = KIND_TEXT[entryKind];
+  const text = kindText(entryKind);
   $("note").placeholder = text.notePlaceholder;
   $("category-new").textContent = text.newCategory;
   $("recent-title").textContent = text.recent;
@@ -335,7 +308,7 @@ function renderEntryTexts() {
 // --- Ekran dodawania ---
 
 function renderCategories() {
-  $("category-value").textContent = selectedCategory || KIND_TEXT[entryKind].categoryPlaceholder;
+  $("category-value").textContent = selectedCategory ? displayName(selectedCategory) : kindText(entryKind).categoryPlaceholder;
   $("category-toggle").classList.toggle("placeholder", !selectedCategory);
 
   const box = $("category-options");
@@ -386,14 +359,14 @@ function categoryItem(name) {
   const item = element("div", "category-item");
   const option = element("button", "category-option");
   const label = element("span", "category-option-label");
-  label.append(avatar(name), element("span", "", name));
+  label.append(avatar(name), element("span", "", displayName(name)));
   option.append(label);
   option.type = "button";
   option.setAttribute("aria-pressed", String(name === selectedCategory));
 
-  const remove = element("button", "category-delete", "Usuń");
+  const remove = element("button", "category-delete", t("deleteWord"));
   remove.type = "button";
-  remove.setAttribute("aria-label", `Usuń kategorię ${name}`);
+  remove.setAttribute("aria-label", t("deleteCategoryAria", { name: displayName(name) }));
   remove.addEventListener("focus", () => openItem(item));
   remove.addEventListener("click", () => removeCategoryWithAnimation(item, name));
 
@@ -466,7 +439,7 @@ function categoryItem(name) {
 
   const grip = element("button", "category-grip");
   grip.type = "button";
-  grip.setAttribute("aria-label", `Przesuń ${name}. Strzałki w górę i w dół zmieniają kolejność.`);
+  grip.setAttribute("aria-label", t("moveAria", { name: displayName(name) }));
   grip.dataset.category = name;
   grip.addEventListener("pointerdown", (event) => startCategoryDrag(event, item, grip));
   grip.addEventListener("keydown", (event) => {
@@ -490,7 +463,7 @@ function moveCategory(from, to) {
   categories.splice(to, 0, categories.splice(from, 1)[0]);
   if (!saveData()) {
     categories.splice(0, categories.length, ...before);
-    showToast("Nie udało się zapisać kolejności.");
+    showToast(t("error.order"));
   }
   renderCategories();
 }
@@ -583,7 +556,7 @@ function removeCategoryWithAnimation(item, name) {
   // Wpisów z "Inne" nie ma już gdzie przenieść.
   if (name === FALLBACK_CATEGORY && transactionsIn(name).length > 0) {
     closeItem(item);
-    showToast(`„${name}” ma zapisane wpisy, więc musi zostać.`);
+    showToast(t("mustStay", { name: displayName(name) }));
     return;
   }
   item.style.height = `${item.offsetHeight}px`;
@@ -615,7 +588,7 @@ function deleteCategory(name) {
   if (!saveData()) {
     undo();
     renderCategories();
-    showToast("Nie udało się usunąć kategorii.");
+    showToast(t("error.deleteCategory"));
     return;
   }
 
@@ -624,8 +597,8 @@ function deleteCategory(name) {
   expandedCategories[kind].delete(name);
   refreshAfterCategoryChange();
 
-  const movedNote = moved.length > 0 ? ` Wpisy przeniesiono do „${FALLBACK_CATEGORY}”.` : "";
-  showToast(`Usunięto „${name}”.${movedNote}`, () => {
+  const movedNote = moved.length > 0 ? t("entriesMoved", { name: displayName(FALLBACK_CATEGORY) }) : "";
+  showToast(t("categoryDeleted", { name: displayName(name), moved: movedNote }), () => {
     undo();
     if (saveData()) refreshAfterCategoryChange();
   });
@@ -637,7 +610,7 @@ function refreshAfterCategoryChange() {
   renderSummary();
 }
 
-function showToast(message, onUndo, actionLabel = "Cofnij") {
+function showToast(message, onUndo, actionLabel = t("undo")) {
   toastUndo = onUndo || null;
   $("toast-text").textContent = message;
   $("toast-undo").textContent = actionLabel;
@@ -833,7 +806,7 @@ function openCategorySheet() {
   newCategoryIcon = null;
   newCategoryIconPicked = false;
   $("new-category").value = "";
-  $("category-sheet-title").textContent = KIND_TEXT[entryKind].sheetTitle;
+  $("category-sheet-title").textContent = kindText(entryKind).sheetTitle;
   renderCategorySheet();
   openSheet("category-sheet", "category-backdrop");
   $("new-category").focus({ preventScroll: true });
@@ -879,7 +852,8 @@ function addCategory(event) {
     return;
   }
   const { categories } = ledger(entryKind);
-  const existing = categories.find((c) => c.toLowerCase() === name.toLowerCase());
+  const lowerName = name.toLowerCase();
+  const existing = categories.find((c) => c.toLowerCase() === lowerName || displayName(c).toLowerCase() === lowerName);
   if (existing) {
     selectedCategory = existing;
   } else {
@@ -890,7 +864,7 @@ function addCategory(event) {
     if (!saveData()) {
       categories.pop();
       if (previousIcon) data.icons[name] = previousIcon;
-      showToast("Nie udało się zapisać w pamięci telefonu.");
+      showToast(t("error.saveCategory"));
       return;
     }
     selectedCategory = name;
@@ -926,8 +900,8 @@ function submitExpense(event) {
 
   setCategoryPanel(false);
   const grosze = parseAmount($("amount").value);
-  if (grosze === null) return showFormError("Wpisz kwotę większą od zera, np. 12,50.");
-  if (!selectedCategory) return showFormError(KIND_TEXT[entryKind].pickCategory);
+  if (grosze === null) return showFormError(t("error.amount"));
+  if (!selectedCategory) return showFormError(kindText(entryKind).pickCategory);
 
   const note = capitalizeFirst($("note").value.trim());
   const { transactions } = ledger(entryKind);
@@ -936,10 +910,10 @@ function submitExpense(event) {
   transactions.push(transaction);
   if (!saveData()) {
     transactions.pop();
-    return showFormError("Nie udało się zapisać wpisu w pamięci telefonu.");
+    return showFormError(t("error.saveEntry"));
   }
 
-  showSavedMessage(`Zapisano: ${formatMoney(grosze)}, ${note || selectedCategory}`);
+  showSavedMessage(t("saved", { amount: formatMoney(grosze), what: note || displayName(selectedCategory) }));
   $("amount").value = "";
   $("note").value = "";
   selectedCategory = null;
@@ -954,11 +928,11 @@ function deleteTransaction(transaction, kind) {
   transactions.splice(index, 1);
   if (!saveData()) {
     transactions.splice(index, 0, transaction);
-    showToast("Nie udało się usunąć wpisu.");
+    showToast(t("error.deleteEntry"));
     return;
   }
   refreshEntries();
-  showToast(`Usunięto: ${transaction.note || transaction.category}, ${formatMoney(transaction.grosze)}.`, () => {
+  showToast(t("entryDeleted", { what: transaction.note || displayName(transaction.category), amount: formatMoney(transaction.grosze) }), () => {
     transactions.splice(Math.min(index, transactions.length), 0, transaction);
     if (saveData()) refreshEntries();
   });
@@ -979,8 +953,8 @@ function transactionRow(transaction, showCategory, kind) {
   const main = element("span", "tx-main");
   if (showCategory) {
     row.append(avatar(transaction.category));
-    main.append(element("span", "tx-title", transaction.note || transaction.category));
-    if (transaction.note) main.append(element("span", "tx-sub", transaction.category));
+    main.append(element("span", "tx-title", transaction.note || displayName(transaction.category)));
+    if (transaction.note) main.append(element("span", "tx-sub", displayName(transaction.category)));
   } else {
     if (transaction.note) main.append(element("span", "tx-title", transaction.note));
     main.append(element("span", "tx-sub", formatDate(transaction.date)));
@@ -989,18 +963,49 @@ function transactionRow(transaction, showCategory, kind) {
   const amountText = (kind === "income" ? "+" : "") + formatMoney(transaction.grosze);
   const amount = element("span", "tx-amount", amountText);
   amount.classList.toggle("income", kind === "income");
+  amount.classList.toggle("savings", kind === "savings");
   row.append(main, amount);
-  row.setAttribute("aria-label", `Edytuj ${KIND_TEXT[kind].one}: ${transaction.note || transaction.category}, ${amountText}`);
+  row.setAttribute("aria-label", t("entryAria", { what: kindText(kind).one, name: transaction.note || displayName(transaction.category), amount: amountText }));
   row.addEventListener("click", () => openEditSheet(transaction, kind));
   return row;
 }
 
+function renderSavingsOverview() {
+  const total = sumOf(data.savings);
+  const box = $("savings-overview");
+  box.hidden = entryKind !== "savings" || total === 0;
+  if (box.hidden) return;
+  $("savings-total").textContent = formatNumber(total);
+
+  const totals = new Map();
+  for (const { category, grosze } of data.savings) totals.set(category, (totals.get(category) || 0) + grosze);
+  const places = $("savings-places");
+  places.replaceChildren();
+  for (const [name, value] of [...totals.entries()].sort((a, b) => b[1] - a[1])) {
+    const row = element("div", "where-row");
+    const head = element("div", "where-head");
+    head.append(
+      avatar(name),
+      element("span", "where-name", displayName(name)),
+      element("span", "where-percent", `${Math.round((value / total) * 100)}%`),
+      element("span", "where-value", formatMoney(value)),
+    );
+    const track = element("div", "where-track");
+    const fill = element("span", "where-fill");
+    fill.style.width = `${Math.max(1, (value / total) * 100)}%`;
+    track.append(fill);
+    row.append(head, track);
+    places.append(row);
+  }
+}
+
 function renderRecent() {
+  renderSavingsOverview();
   const list = $("recent-list");
   list.replaceChildren();
   const recent = [...ledger(entryKind).transactions].sort(sortNewestFirst).slice(0, RECENT_LIMIT);
   if (recent.length === 0) {
-    list.append(element("p", "empty", KIND_TEXT[entryKind].empty));
+    list.append(element("p", "empty", kindText(entryKind).empty));
     return;
   }
   let currentDate = null;
@@ -1034,7 +1039,7 @@ function refreshPeriodViews() {
 
 // Lata, w których coś wpisano, oraz bieżący i wybrany rok, od najnowszego.
 function availableYears() {
-  const years = [...data.transactions, ...data.incomes].map((t) => Number(t.date.slice(0, 4)));
+  const years = allEntries().map((entry) => Number(entry.date.slice(0, 4)));
   years.push(new Date().getFullYear(), summaryYear);
   return [...new Set(years)].sort((a, b) => b - a);
 }
@@ -1069,10 +1074,10 @@ function renderPeriodSheet() {
   const today = new Date();
   const isMonth = summaryMode === "month";
   const years = availableYears();
-  const used = new Set([...data.transactions, ...data.incomes].map((t) => t.date.slice(0, 7)));
+  const used = new Set(allEntries().map((entry) => entry.date.slice(0, 7)));
   const grid = $("period-grid");
 
-  $("period-title").textContent = isMonth ? "Wybierz miesiąc" : "Wybierz rok";
+  $("period-title").textContent = t(isMonth ? "pickMonth" : "pickYear");
   $("period-year-row").hidden = !isMonth;
   grid.replaceChildren();
 
@@ -1113,37 +1118,44 @@ function transactionsInPeriod(kind) {
   return ledger(kind).transactions.filter((t) => t.date.startsWith(prefix));
 }
 
-// Bilans okresu: ile zostało, oraz pasek pokazujący, jaką część wpływów pochłonęły wydatki.
-function renderBalance(incomeTotal, expenseTotal) {
-  const net = incomeTotal - expenseTotal;
-  const sign = net > 0 ? "+" : net < 0 ? "−" : "";
-  const periodName = summaryMode === "month"
+function periodLabel() {
+  return summaryMode === "month"
     ? `${MONTHS[summaryMonth]} ${summaryYear}`
-    : `Rok ${summaryYear}`;
-  $("total-label").textContent = `Bilans · ${periodName}`;
+    : t("yearLabel", { year: summaryYear });
+}
+
+// Bilans okresu: zarobki minus wydatki i wpłaty, a pasek pokazuje, na co poszły zarobki.
+function renderBalance(incomeTotal, expenseTotal, savedTotal) {
+  const net = incomeTotal - expenseTotal - savedTotal;
+  const sign = net > 0 ? "+" : net < 0 ? "−" : "";
+  $("total-label").textContent = t("balanceLabel", { period: periodLabel() });
   $("total-amount").textContent = sign + formatNumber(Math.abs(net));
 
-  let note = "Brak wpisów w tym okresie";
-  if (incomeTotal === 0 && expenseTotal > 0) note = "Brak wpływów w tym okresie";
-  else if (net < 0) note = `Wydatki przekraczają wpływy o ${formatMoney(-net)}`;
-  else if (incomeTotal > 0) note = `Zostaje ${Math.round((net / incomeTotal) * 100)}% wpływów`;
+  let note = t("balance.empty");
+  if (incomeTotal === 0 && expenseTotal + savedTotal > 0) note = t("balance.noIncome");
+  else if (net < 0) note = t(savedTotal > 0 ? "balance.overSaved" : "balance.over", { amount: formatMoney(-net) });
+  else if (incomeTotal > 0) note = t("balance.left", { percent: Math.round((net / incomeTotal) * 100) });
   $("balance-note").textContent = note;
 
   $("balance-bar").hidden = incomeTotal === 0;
-  $("balance-fill").style.width = `${Math.min(100, (expenseTotal / (incomeTotal || 1)) * 100)}%`;
+  const base = Math.max(incomeTotal, expenseTotal + savedTotal, 1);
+  $("balance-fill").style.width = `${(expenseTotal / base) * 100}%`;
+  $("balance-saved").style.width = `${(savedTotal / base) * 100}%`;
 
   $("income-total").textContent = (incomeTotal > 0 ? "+" : "") + formatNumber(incomeTotal);
   $("expense-total").textContent = formatNumber(expenseTotal);
-  $("view-income").setAttribute("aria-pressed", String(summaryView === "income"));
-  $("view-expense").setAttribute("aria-pressed", String(summaryView === "expense"));
+  $("savings-sum").textContent = formatNumber(savedTotal);
+  for (const kind of ["income", "expense", "savings"]) {
+    $(`view-${kind}`).setAttribute("aria-pressed", String(summaryView === kind));
+  }
 }
 
 function renderSummary() {
   renderPeriodControls();
-  renderBalance(sumOf(transactionsInPeriod("income")), sumOf(transactionsInPeriod("expense")));
+  renderBalance(sumOf(transactionsInPeriod("income")), sumOf(transactionsInPeriod("expense")), sumOf(transactionsInPeriod("savings")));
 
   const view = summaryView;
-  const text = KIND_TEXT[view];
+  const text = kindText(view);
   const hidden = hiddenCategories[view];
   const { categories } = ledger(view);
   const inPeriod = transactionsInPeriod(view);
@@ -1158,11 +1170,11 @@ function renderSummary() {
   const filtered = hidden.size > 0;
   const visibleTotal = groups.reduce((sum, g) => sum + g.total, 0);
   $("filter-open").textContent = filtered
-    ? `Filtruj (${categories.length - hidden.size}/${categories.length})`
-    : "Filtruj";
+    ? `${t("filter")} (${categories.length - hidden.size}/${categories.length})`
+    : t("filter");
   $("filter-open").classList.toggle("active", filtered);
   $("filtered-note").hidden = !filtered;
-  $("filtered-note").textContent = `${text.filterSelected}: ${formatMoney(visibleTotal)}`;
+  $("filtered-note").textContent = t("selectedSum", { label: text.filterSelected, amount: formatMoney(visibleTotal) });
 
   const list = $("summary-list");
   list.dataset.mode = view;
@@ -1195,13 +1207,14 @@ function categoryCard(group, periodTotal, kind) {
 
   const info = element("span", "category-info");
   info.append(
-    element("span", "category-name", group.name),
+    element("span", "category-name", displayName(group.name)),
     element("span", "category-count", countLabel(group.transactions.length, kind)),
   );
   const head = element("span", "category-head");
   const isIncome = kind === "income" && !isEmpty;
   const sum = element("span", "category-sum", (isIncome ? "+" : "") + formatMoney(group.total));
   sum.classList.toggle("income", isIncome);
+  sum.classList.toggle("savings", kind === "savings" && !isEmpty);
   head.append(avatar(group.name), info, sum);
   row.append(head);
 
@@ -1228,7 +1241,7 @@ function categoryCard(group, periodTotal, kind) {
 function renderFilterOptions() {
   const box = $("filter-options");
   const hidden = hiddenCategories[summaryView];
-  $("filter-title").textContent = KIND_TEXT[summaryView].filterTitle;
+  $("filter-title").textContent = kindText(summaryView).filterTitle;
   box.replaceChildren();
   for (const name of ledger(summaryView).categories) {
     const label = element("label", "filter-option");
@@ -1240,7 +1253,7 @@ function renderFilterOptions() {
       else hidden.add(name);
       renderSummary();
     });
-    label.append(checkbox, element("span", "", name));
+    label.append(checkbox, element("span", "", displayName(name)));
     box.append(label);
   }
 }
@@ -1262,15 +1275,16 @@ function closeFilter() {
 // --- Panel edycji wpisu ---
 
 function amountForEditing(grosze) {
-  return (grosze / 100).toFixed(2).replace(".", ",").replace(/,00$/, "");
+  const text = (grosze / 100).toFixed(2).replace(/\.00$/, "");
+  return language === "pl" ? text.replace(".", ",") : text;
 }
 
 function openEditSheet(transaction, kind) {
   editing = { transaction, kind, category: transaction.category, date: transaction.date };
-  const text = KIND_TEXT[kind];
+  const text = kindText(kind);
   $("edit-sheet").dataset.mode = kind;
-  $("edit-title").textContent = `Edytuj ${text.one}`;
-  $("edit-delete").textContent = `Usuń ${text.one}`;
+  $("edit-title").textContent = t("editEntry", { what: text.one });
+  $("edit-delete").textContent = t("deleteEntry", { what: text.one });
   $("edit-amount").value = amountForEditing(transaction.grosze);
   $("edit-note").value = transaction.note || "";
   $("edit-note").placeholder = text.notePlaceholder;
@@ -1302,7 +1316,7 @@ function renderEditCategories() {
     const chip = element("button", "edit-chip");
     chip.type = "button";
     chip.setAttribute("aria-pressed", String(name === editing.category));
-    chip.append(avatar(name), element("span", "", name));
+    chip.append(avatar(name), element("span", "", displayName(name)));
     chip.addEventListener("click", () => {
       editing.category = name;
       renderEditCategories();
@@ -1330,7 +1344,7 @@ function saveEdit(event) {
   event.preventDefault();
   const grosze = parseAmount($("edit-amount").value);
   if (grosze === null) {
-    $("edit-error").textContent = "Wpisz kwotę większą od zera, np. 12,50.";
+    $("edit-error").textContent = t("error.amount");
     $("edit-error").hidden = false;
     return;
   }
@@ -1352,13 +1366,13 @@ function saveEdit(event) {
 
   if (!saveData()) {
     restore();
-    $("edit-error").textContent = "Nie udało się zapisać zmian w pamięci telefonu.";
+    $("edit-error").textContent = t("error.saveEdit");
     $("edit-error").hidden = false;
     return;
   }
   closeEditSheet();
   refreshEntries();
-  showToast("Zapisano zmiany.", () => {
+  showToast(t("changesSaved"), () => {
     restore();
     if (saveData()) refreshEntries();
   });
@@ -1393,13 +1407,13 @@ function dataCounts(source) {
   return {
     expenses: source.transactions.length,
     incomes: source.incomes.length,
-    categories: source.categories.length + source.incomeCategories.length,
+    savings: source.savings.length,
   };
 }
 
 function isBackupDue() {
-  const { expenses, incomes } = dataCounts(data);
-  const total = expenses + incomes;
+  const { expenses, incomes, savings } = dataCounts(data);
+  const total = expenses + incomes + savings;
   if (total === 0) return false;
   const last = Number(readLocal(LAST_BACKUP_KEY));
   if (!last) return total >= BACKUP_FIRST_AFTER_ENTRIES;
@@ -1407,7 +1421,9 @@ function isBackupDue() {
 }
 
 function updateBackupIndicator() {
-  $("backup-open").classList.toggle("due", isBackupDue());
+  const due = isBackupDue();
+  for (const button of document.querySelectorAll(".settings-open")) button.classList.toggle("due", due);
+  $("backup-open").classList.toggle("due", due);
 }
 
 // Przypomnienie pojawia się najwyżej raz w tygodniu, żeby nie przeszkadzać.
@@ -1416,26 +1432,34 @@ function maybeRemindBackup() {
   const reminded = Number(readLocal(BACKUP_REMINDER_KEY));
   if (Date.now() - reminded < BACKUP_REMINDER_EVERY_DAYS * DAY_MS) return;
   writeLocal(BACKUP_REMINDER_KEY, String(Date.now()));
-  showToast("Czas na kopię danych.", openBackupSheet, "Zrób");
+  showToast(t("backup.remind"), openBackupSheet, t("backup.remindAction"));
+}
+
+function backupStatusText() {
+  const last = Number(readLocal(LAST_BACKUP_KEY));
+  return last ? t("backup.last", { date: formatDate(dateToString(new Date(last))) }) : t("backup.none");
+}
+
+function countsText(counts) {
+  const parts = [countLabel(counts.expenses, "expense"), countLabel(counts.incomes, "income")];
+  if (counts.savings > 0) parts.push(countLabel(counts.savings, "savings"));
+  return parts.join(", ");
 }
 
 function renderBackupSheet() {
   const last = Number(readLocal(LAST_BACKUP_KEY));
   const due = isBackupDue();
-  const { expenses, incomes, categories } = dataCounts(data);
-  $("backup-title").textContent = last && !due ? "Dane zabezpieczone" : "Zabezpiecz swoje dane";
-  $("backup-status").textContent = last
-    ? `Ostatnia kopia: ${formatDate(dateToString(new Date(last)))}`
-    : "Nie masz jeszcze żadnej kopii";
+  const { expenses, incomes, savings } = dataCounts(data);
+  $("backup-title").textContent = t(last && !due ? "backup.safe" : "backup.unsafe");
+  $("backup-status").textContent = backupStatusText();
   $("backup-count-expenses").textContent = expenses;
   $("backup-count-incomes").textContent = incomes;
-  $("backup-count-categories").textContent = categories;
+  $("backup-count-savings").textContent = savings;
   $("backup-actions").hidden = Boolean(pendingImport);
   $("backup-confirm").hidden = !pendingImport;
   if (pendingImport) {
-    const counts = dataCounts(pendingImport.data);
-    const when = pendingImport.date ? ` z ${formatDate(pendingImport.date)}` : "";
-    $("backup-confirm-text").textContent = `Kopia${when}: ${countLabel(counts.expenses, "expense")}, ${countLabel(counts.incomes, "income")}.`;
+    const date = pendingImport.date ? t("backup.from", { date: formatDate(pendingImport.date) }) : "";
+    $("backup-confirm-text").textContent = t("backup.confirm", { date, counts: countsText(dataCounts(pendingImport.data)) });
   }
 }
 
@@ -1448,7 +1472,7 @@ function openBackupSheet() {
 }
 
 function closeBackupSheet() {
-  closeSheet("backup-sheet", "backup-backdrop", "backup-open");
+  closeSheet("backup-sheet", "backup-backdrop", `nav-${activeTab}`);
   pendingImport = null;
 }
 
@@ -1482,7 +1506,7 @@ async function saveBackup() {
   try {
     await deliverBackupFile(JSON.stringify(payload, null, 2), `moje-wydatki-kopia-${todayString()}.json`);
   } catch (error) {
-    if (error.name !== "AbortError") showBackupError("Nie udało się zapisać kopii. Spróbuj ponownie.");
+    if (error.name !== "AbortError") showBackupError(t("backup.saveError"));
     return;
   }
   writeLocal(LAST_BACKUP_KEY, String(Date.now()));
@@ -1531,6 +1555,8 @@ function parseBackup(text) {
   const source = parsed.data;
   const transactions = cleanEntries(source.transactions);
   const incomes = cleanEntries(source.incomes);
+  // Kopie sprzed wprowadzenia karty Odkładam nie mają wpłat.
+  const savings = cleanEntries(source.savings || []);
   const icons = source.icons && typeof source.icons === "object" ? source.icons : {};
   const exportedAt = new Date(parsed.exportedAt);
   return {
@@ -1540,6 +1566,10 @@ function parseBackup(text) {
       transactions,
       incomeCategories: cleanCategories(source.incomeCategories, incomes),
       incomes,
+      savingsCategories: source.savingsCategories || savings.length > 0
+        ? cleanCategories(source.savingsCategories, savings)
+        : undefined,
+      savings,
       icons: Object.fromEntries(Object.entries(icons).filter(([, icon]) => typeof icon === "string")),
     }),
   };
@@ -1551,14 +1581,14 @@ async function chooseBackupFile(event) {
   if (!file) return;
   $("backup-error").hidden = true;
   if (file.size > BACKUP_MAX_BYTES) {
-    showBackupError("Ten plik jest za duży, to nie wygląda na kopię z tej aplikacji.");
+    showBackupError(t("backup.tooBig"));
     return;
   }
   try {
     pendingImport = parseBackup(await file.text());
   } catch {
     pendingImport = null;
-    showBackupError("Ten plik to nie jest poprawna kopia z tej aplikacji. Twoje dane są bez zmian.");
+    showBackupError(t("backup.invalid"));
     return;
   }
   renderBackupSheet();
@@ -1570,7 +1600,8 @@ function replaceAllData(next) {
   selectedCategory = null;
   drafts.expense = null;
   drafts.income = null;
-  for (const kind of ["expense", "income"]) {
+  drafts.savings = null;
+  for (const kind of ["expense", "income", "savings"]) {
     hiddenCategories[kind].clear();
     expandedCategories[kind].clear();
   }
@@ -1587,19 +1618,57 @@ function confirmImport() {
     replaceAllData(before);
     pendingImport = null;
     renderBackupSheet();
-    showBackupError("Nie udało się wczytać kopii. Twoje dane są bez zmian.");
+    showBackupError(t("backup.loadError"));
     refreshEntries();
     return;
   }
-  const { expenses, incomes } = dataCounts(data);
+  const counts = dataCounts(data);
   closeBackupSheet();
   refreshEntries();
   updateBackupIndicator();
-  showToast(`Wczytano: ${countLabel(expenses, "expense")}, ${countLabel(incomes, "income")}.`, () => {
+  showToast(t("backup.loaded", { counts: countsText(counts) }), () => {
     replaceAllData(before);
     if (saveData()) refreshEntries();
     updateBackupIndicator();
   });
+}
+
+// --- Ustawienia ---
+
+function renderSettings() {
+  for (const button of document.querySelectorAll(".language-option")) {
+    button.setAttribute("aria-pressed", String(button.dataset.language === language));
+  }
+  $("settings-backup-status").textContent = backupStatusText();
+}
+
+function openSettings() {
+  renderSettings();
+  $("settings-panel").hidden = false;
+  $("settings-backdrop").hidden = false;
+  $("settings-title").focus({ preventScroll: true });
+}
+
+function closeSettings() {
+  if ($("settings-panel").hidden) return;
+  $("settings-panel").hidden = true;
+  $("settings-backdrop").hidden = true;
+}
+
+// Zmiana języka od razu przerysowuje cały ekran; dane pozostają bez zmian.
+function setLanguage(next) {
+  if (next === language) return;
+  saveLanguage(next);
+  applyStaticTexts();
+  renderEntryTexts();
+  fitAmountField($("amount"), $("amount-sizer"));
+  updateDateLabel();
+  renderCategories();
+  renderRecent();
+  renderSummary();
+  if (activeTab === "wykresy") renderCharts();
+  renderSettings();
+  updateTabIndicator();
 }
 
 // --- Przesuwanie palcem między kartami ---
@@ -1741,7 +1810,16 @@ $("edit-note").addEventListener("input", () => {
   capitalizeInput($("edit-note"));
   updateEditSaveButton();
 });
-$("backup-open").addEventListener("click", openBackupSheet);
+for (const button of document.querySelectorAll(".settings-open")) button.addEventListener("click", openSettings);
+for (const button of document.querySelectorAll(".language-option")) {
+  button.addEventListener("click", () => setLanguage(button.dataset.language));
+}
+$("settings-close").addEventListener("click", closeSettings);
+$("settings-backdrop").addEventListener("click", closeSettings);
+$("backup-open").addEventListener("click", () => {
+  closeSettings();
+  openBackupSheet();
+});
 $("backup-backdrop").addEventListener("click", closeBackupSheet);
 $("backup-save").addEventListener("click", saveBackup);
 $("backup-load").addEventListener("click", () => $("backup-file").click());
@@ -1793,6 +1871,7 @@ $("period-year-next").addEventListener("click", () => { periodSheetYear += 1; re
 
 $("view-income").addEventListener("click", () => { summaryView = "income"; renderSummary(); });
 $("view-expense").addEventListener("click", () => { summaryView = "expense"; renderSummary(); });
+$("view-savings").addEventListener("click", () => { summaryView = "savings"; renderSummary(); });
 
 $("filter-open").addEventListener("click", openFilter);
 $("filter-close").addEventListener("click", closeFilter);
@@ -1810,6 +1889,7 @@ document.addEventListener("keydown", (event) => {
       return;
     }
     closeFilter();
+    closeSettings();
     setCategoryPanel(false);
     closeCategorySheet();
     closePeriodSheet();
@@ -1818,6 +1898,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+applyStaticTexts();
 updateDateLabel();
 renderEntryTexts();
 renderCategories();

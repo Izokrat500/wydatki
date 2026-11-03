@@ -1,12 +1,13 @@
 // Tryb offline: zapamiętuje pliki aplikacji w telefonie.
 // Z internetem pobiera najnowszą wersję, bez internetu używa zapamiętanej.
 
-const CACHE_NAME = "wydatki-v2";
+const CACHE_NAME = "wydatki-v3";
 const NETWORK_TIMEOUT_MS = 3000;
 const APP_FILES = [
   "./",
   "index.html",
   "style.css",
+  "i18n.js",
   "app.js",
   "charts.js",
   "manifest.webmanifest",
