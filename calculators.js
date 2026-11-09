@@ -15,7 +15,7 @@ const FIELD_RATE = { key: "rate", label: "calc.rate", unit: "%", stops: [0, 20],
 const CALC_DEFAULTS = {
   compound: { initial: 10000, monthly: 500, rate: 6, years: 20, perYear: 12, tax: true },
   loan: { amount: 300000, rate: 7.5, years: 25, type: "equal" },
-  overpay: { balance: 300000, rate: 7.5, years: 25, monthly: 500, oneOff: 0, mode: "shorter" },
+  overpay: { balance: 300000, rate: 7.5, installments: 300, monthly: 500, oneOff: 0, mode: "shorter" },
 };
 
 const CALC_ICONS = {
@@ -133,6 +133,14 @@ function yearsWord(years) {
   return Number.isInteger(years) && lastDigit >= 2 && lastDigit <= 4 && !teens ? "lata" : "lat";
 }
 
+function installmentsWord(count) {
+  if (language !== "pl") return count === 1 ? "payment" : "payments";
+  if (count === 1) return "rata";
+  const lastDigit = count % 10;
+  const teens = count % 100 >= 12 && count % 100 <= 14;
+  return Number.isInteger(count) && lastDigit >= 2 && lastDigit <= 4 && !teens ? "raty" : "rat";
+}
+
 function yearsText(years) {
   return `${calcNumber(years, 1)} ${yearsWord(years)}`;
 }
@@ -178,6 +186,7 @@ function parseCalcValue(text) {
 }
 
 function fieldUnit(field, value) {
+  if (field.unit === "installments") return installmentsWord(value);
   return field.unit === "years" ? yearsWord(value) : field.unit;
 }
 
@@ -479,7 +488,7 @@ function updateLoan() {
   const overpayLink = element("button", "btn-ghost pots-action", t("calc.loan.toOverpay"));
   overpayLink.type = "button";
   overpayLink.addEventListener("click", () => {
-    Object.assign(calcState.overpay, { balance: values.amount, rate: values.rate, years: values.years });
+    Object.assign(calcState.overpay, { balance: values.amount, rate: values.rate, installments: toMonths(values.years) });
     openCalculator("overpay");
   });
 
@@ -520,7 +529,7 @@ function overpayChoice(mode, title, saved, detail) {
 function updateOverpay() {
   const values = calcState.overpay;
   if (values.balance <= 0) return showCalcNeedsAmount();
-  const months = toMonths(values.years);
+  const months = Math.max(1, Math.round(values.installments));
   const monthlyRate = values.rate / 100 / 12;
   const simulate = (monthly, oneOff, mode) => overpaySimulation(values.balance, monthlyRate, months, monthly, oneOff, mode);
   const base = simulate(0, 0, "shorter");
@@ -532,13 +541,15 @@ function updateOverpay() {
   const hasOverpayment = values.monthly > 0 || values.oneOff > 0;
 
   // Przy stałej nadpłacie rata topnieje co miesiąc, więc pokazujemy ją po roku, a nie tuż przed końcem.
-  const newPayment = moneyExact(values.monthly > 0 && lower.paymentAfterYear ? lower.paymentAfterYear : lower.lastPayment);
-  const lowerDetail = t(values.monthly > 0 ? "calc.overpay.lowerDetailYear" : "calc.overpay.lowerDetail", { payment: newPayment });
-  const shorterDetail = t("calc.overpay.shorterDetail", { time: durationText(base.months - shorter.months) });
+  const afterYear = values.monthly > 0 && lower.paymentAfterYear > 0;
+  const newPayment = moneyExact(afterYear ? lower.paymentAfterYear : lower.lastPayment);
+  const lowerDetail = t(afterYear ? "calc.overpay.lowerDetailYear" : "calc.overpay.lowerDetail", { payment: newPayment });
+  const monthsSaved = base.months - shorter.months;
+  const shorterDetail = monthsSaved > 0 ? t("calc.overpay.shorterDetail", { time: durationText(monthsSaved) }) : t("calc.overpay.sameTerm");
   let sentence = t("calc.overpay.enter");
-  if (hasOverpayment && values.mode === "shorter") sentence = t("calc.overpay.sentenceShorter", { time: durationText(base.months - shorter.months) });
+  if (hasOverpayment && values.mode === "shorter") sentence = monthsSaved > 0 ? t("calc.overpay.sentenceShorter", { time: durationText(monthsSaved) }) : t("calc.overpay.sentenceSame");
   if (hasOverpayment && values.mode === "lower") {
-    sentence = t(values.monthly > 0 ? "calc.overpay.sentenceLowerEnd" : "calc.overpay.sentenceLower", { from: moneyExact(currentPayment), to: newPayment });
+    sentence = t(afterYear ? "calc.overpay.sentenceLowerEnd" : "calc.overpay.sentenceLower", { from: moneyExact(currentPayment), to: newPayment });
   }
   setCalcHero(t("calc.overpay.hero"), calcNumber(Math.round(saved)), sentence);
 
@@ -561,7 +572,7 @@ function updateOverpay() {
       [t("calc.overpay.current"), moneyExact(currentPayment)],
       [t("calc.overpay.interestWithout"), moneyWhole(base.interest)],
       [t("calc.overpay.interestWith"), moneyWhole(chosen.interest)],
-      [t("calc.overpay.duration"), durationText(chosen.months), true],
+      [t("calc.overpay.duration"), chosen.months > 0 ? `${chosen.months} ${installmentsWord(chosen.months)} · ${durationText(chosen.months)}` : durationText(0), true],
     ])),
     calcCard(
       ...chartBlock(t("calc.overpay.chart"), sentence, series),
@@ -623,7 +634,7 @@ function calcScreens() {
       controls: () => [
         fieldRow("overpay", { key: "balance", label: "calc.overpay.balance", unit: "PLN", stops: STOPS_LOAN, limit: AMOUNT_LIMIT }),
         fieldRow("overpay", FIELD_RATE),
-        fieldRow("overpay", { key: "years", label: "calc.overpay.years", unit: "years", stops: [1, 35], step: 1, limit: 50 }),
+        fieldRow("overpay", { key: "installments", label: "calc.overpay.installments", unit: "installments", stops: [1, 60, 120, 240, 360, 420], step: 1, limit: 600 }),
         fieldRow("overpay", { key: "monthly", label: "calc.overpay.monthly", unit: "PLN", stops: STOPS_MONTHLY, limit: AMOUNT_LIMIT }),
         fieldRow("overpay", { key: "oneOff", label: "calc.overpay.oneOff", unit: "PLN", stops: STOPS_ONE_OFF, limit: AMOUNT_LIMIT }),
       ],
@@ -705,6 +716,8 @@ function loadCalcState() {
   try {
     saved = JSON.parse(readLocal(STORAGE_KEY + ".calculators")) || {};
   } catch {}
+  // Wcześniej nadpłata pamiętała pozostałe lata zamiast liczby rat.
+  if (saved.overpay && saved.overpay.installments === undefined && saved.overpay.years > 0) saved.overpay.installments = toMonths(saved.overpay.years);
   const state = {};
   for (const [calc, defaults] of Object.entries(CALC_DEFAULTS)) {
     state[calc] = { ...defaults };
