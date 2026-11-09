@@ -1,6 +1,6 @@
 // --- Skarbonki: pieniądze przydzielone do kategorii; przydział nie zmienia Bilansu ---
 
-let savingsView = "pots"; // co pokazuje karta Net worth: "pots", "entries" albo "networth"
+let savingsView = "entries"; // co pokazuje karta Oszczędności: "entries", "pots" albo "networth"
 let openPotId = null; // skarbonka otwarta w panelu szczegółów
 
 function formatSignedMoney(grosze) {
@@ -62,7 +62,7 @@ function potLeft(pot) {
   return potAdded(pot) - potSpent(pot);
 }
 
-// --- Widok karty Net worth ---
+// --- Widok karty Oszczędności ---
 
 function updateSavingsView() {
   const isSavingsTab = entryKind === "savings" && activeTab === "odkladam";
@@ -135,7 +135,7 @@ function openPotNewSheet() {
 }
 
 function closePotNewSheet() {
-  closeSheet("pot-new-sheet", "pot-new-backdrop", `nav-${activeTab}`);
+  closeSheet("pot-new-sheet", "pot-new-backdrop", activeNavId());
 }
 
 function renderPotNewChips() {
@@ -213,7 +213,7 @@ function openSplitSheet() {
 }
 
 function closeSplitSheet() {
-  closeSheet("split-sheet", "split-backdrop", `nav-${activeTab}`);
+  closeSheet("split-sheet", "split-backdrop", activeNavId());
 }
 
 function splitAmounts() {
@@ -262,7 +262,7 @@ function openPotDetail(id) {
 }
 
 function closePotDetail() {
-  closeSheet("pot-detail-sheet", "pot-detail-backdrop", `nav-${activeTab}`);
+  closeSheet("pot-detail-sheet", "pot-detail-backdrop", activeNavId());
   openPotId = null;
 }
 

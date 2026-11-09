@@ -121,7 +121,7 @@ function openAssetSheet(item = null) {
 }
 
 function closeAssetSheet() {
-  closeSheet("asset-sheet", "asset-backdrop", `nav-${activeTab}`);
+  closeSheet("asset-sheet", "asset-backdrop", activeNavId());
 }
 
 function saveAsset(event) {

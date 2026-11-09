@@ -249,19 +249,32 @@ function element(tag, className, text) {
 
 // --- Zakładki ---
 
-const TABS = ["wydatki", "wplywy", "odkladam", "podsumowanie", "wykresy", "kalkulatory"];
+const TABS = ["wydatki", "wplywy", "podsumowanie", "wykresy", "odkladam", "kalkulatory"]; // kolejność przesuwania palcem
+const NAV_ITEMS = { wpisy: ["wydatki", "wplywy"], bilans: ["podsumowanie", "wykresy"], odkladam: ["odkladam"], kalkulatory: ["kalkulatory"] };
 const ENTRY_TABS = { wydatki: "expense", wplywy: "income", odkladam: "savings" };
 
+function navItemFor(tab) {
+  return Object.keys(NAV_ITEMS).find((item) => NAV_ITEMS[item].includes(tab));
+}
+
+function activeNavId() {
+  return `nav-${navItemFor(activeTab)}`;
+}
+
 function showTab(name) {
+  if (name === "odkladam" && activeTab !== "odkladam") savingsView = "entries"; // po wejściu zawsze najpierw Wpłaty
   $("tab-transakcje").hidden = !ENTRY_TABS[name];
   $("tab-podsumowanie").hidden = name !== "podsumowanie";
   $("tab-wykresy").hidden = name !== "wykresy";
   $("tab-kalkulatory").hidden = name !== "kalkulatory";
   $("filter-open").hidden = name !== "podsumowanie";
-  for (const tab of TABS) {
-    const button = $("nav-" + tab);
-    if (tab === name) button.setAttribute("aria-current", "page");
+  for (const [item, tabs] of Object.entries(NAV_ITEMS)) {
+    const button = $("nav-" + item);
+    if (tabs.includes(name)) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
+    if (tabs.length < 2) continue;
+    $("switch-" + item).hidden = !tabs.includes(name);
+    for (const tab of tabs) $("sub-" + tab).setAttribute("aria-pressed", String(tab === name));
   }
   activeTab = name;
   updateTabIndicator();
@@ -277,11 +290,10 @@ function showTab(name) {
 
 // Podświetlenie przesuwa się pod aktywną zakładkę i przyjmuje jej szerokość.
 function updateTabIndicator() {
-  const button = $("nav-" + activeTab);
+  const button = $(activeNavId());
   const bar = $("tabbar-switch");
   bar.style.setProperty("--tab-x", `${button.offsetLeft}px`);
   bar.style.setProperty("--tab-width", `${button.offsetWidth}px`);
-  bar.scrollLeft = button.offsetLeft - (bar.clientWidth - button.offsetWidth) / 2; // na wąskim ekranie pasek się przewija
   requestAnimationFrame(() => bar.classList.add("animated"));
 }
 
@@ -1365,7 +1377,7 @@ function openEditSheet(transaction, kind) {
 }
 
 function closeEditSheet() {
-  closeSheet("edit-sheet", "edit-backdrop", `nav-${activeTab}`);
+  closeSheet("edit-sheet", "edit-backdrop", activeNavId());
   editing = null;
 }
 
@@ -1537,7 +1549,7 @@ function openBackupSheet() {
 }
 
 function closeBackupSheet() {
-  closeSheet("backup-sheet", "backup-backdrop", `nav-${activeTab}`);
+  closeSheet("backup-sheet", "backup-backdrop", activeNavId());
   pendingImport = null;
 }
 
@@ -1832,7 +1844,10 @@ function setupTabSwipe() {
 
 // --- Start aplikacji ---
 
-for (const tab of TABS) $("nav-" + tab).addEventListener("click", () => showTab(tab));
+for (const [item, tabs] of Object.entries(NAV_ITEMS)) {
+  $("nav-" + item).addEventListener("click", () => showTab(tabs[0]));
+  if (tabs.length > 1) for (const tab of tabs) $("sub-" + tab).addEventListener("click", () => showTab(tab));
+}
 $("expense-form").addEventListener("submit", submitExpense);
 $("amount").addEventListener("input", updateAmountField);
 $("category-toggle").addEventListener("click", () => {

@@ -19,22 +19,30 @@
     <!-- Zakładki na górze -->
     <nav class="tabbar">
       <div id="tabbar-switch" class="tabbar-switch">
-        <button id="nav-wydatki" type="button" data-i18n="tab.expense"></button>
-        <button id="nav-wplywy" type="button" data-i18n="tab.income"></button>
+        <button id="nav-wpisy" type="button" data-i18n="tab.entries"></button>
+        <button id="nav-bilans" type="button" data-i18n="tab.balance"></button>
         <button id="nav-odkladam" type="button" data-i18n="tab.savings"></button>
-        <button id="nav-podsumowanie" type="button" data-i18n="tab.balance"></button>
-        <button id="nav-wykresy" type="button" data-i18n="tab.charts"></button>
         <button id="nav-kalkulatory" type="button" data-i18n="tab.calc"></button>
       </div>
     </nav>
 
     <main>
-      <!-- Zakładki Wydatki, Zarobki i Net worth: ten sam ekran, inne dane i kolor -->
+      <!-- Dwa widoki pod jedną zakładką u góry -->
+      <div id="switch-wpisy" class="segmented group-switch" role="group" data-i18n-aria="tab.entries">
+        <button id="sub-wydatki" type="button" data-i18n="tab.expense"></button>
+        <button id="sub-wplywy" type="button" data-i18n="tab.income"></button>
+      </div>
+      <div id="switch-bilans" class="segmented group-switch" role="group" data-i18n-aria="tab.balance" hidden>
+        <button id="sub-podsumowanie" type="button" data-i18n="tab.summary"></button>
+        <button id="sub-wykresy" type="button" data-i18n="tab.charts"></button>
+      </div>
+
+      <!-- Wydatki, Zarobki i Oszczędności: ten sam ekran, inne dane i kolor -->
       <section id="tab-transakcje" class="tab">
-        <!-- Karta Net worth: Skarbonki, Oszczędności albo Net worth -->
+        <!-- Karta Oszczędności: Wpłaty, Skarbonki albo Net worth -->
         <div id="savings-switch" class="segmented savings-switch" role="group" hidden>
-          <button id="savings-view-pots" type="button" data-i18n="pots.tab"></button>
           <button id="savings-view-entries" type="button" data-i18n="pots.savingsTab"></button>
+          <button id="savings-view-pots" type="button" data-i18n="pots.tab"></button>
           <button id="savings-view-networth" type="button" data-i18n="networth.tab"></button>
         </div>
 
