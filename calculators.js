@@ -567,9 +567,13 @@ function updateOverpay() {
     { label: t("calc.overpay.with"), values: labels.map((year) => balanceAt(chosen, year)), line: "chart-line-expense", area: "calc-area-violet", marker: "chart-marker-expense", key: "key-line-expense" },
   ];
 
+  const startPayment = values.mode === "lower" ? loanPayment(Math.max(values.balance - values.oneOff, 0), monthlyRate, months) : currentPayment;
+  const monthlyRow = values.monthly > 0 ? [[t("calc.overpay.paidMonthly"), moneyExact(startPayment + values.monthly)]] : [];
+
   $("calc-details").replaceChildren(
     calcCard(calcRows([
       [t("calc.overpay.current"), moneyExact(currentPayment)],
+      ...monthlyRow,
       [t("calc.overpay.interestWithout"), moneyWhole(base.interest)],
       [t("calc.overpay.interestWith"), moneyWhole(chosen.interest)],
       [t("calc.overpay.duration"), chosen.months > 0 ? `${chosen.months} ${installmentsWord(chosen.months)} · ${durationText(chosen.months)}` : durationText(0), true],
