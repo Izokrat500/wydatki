@@ -14,12 +14,14 @@ const FIELD_RATE = { key: "rate", label: "calc.rate", unit: "%", stops: [0, 20],
 
 const CALC_DEFAULTS = {
   compound: { initial: 10000, monthly: 500, rate: 6, years: 20, perYear: 12, tax: true },
+  inflation: { amount: 10000, inflation: 3.5, rate: 0, years: 10 },
   loan: { amount: 300000, rate: 7.5, years: 25, type: "equal" },
   overpay: { balance: 300000, rate: 7.5, installments: 300, monthly: 500, oneOff: 0, mode: "shorter" },
 };
 
 const CALC_ICONS = {
   compound: "M4 17l5-5 4 4 7-8M15 8h5v5",
+  inflation: "M4 7l5 5 4-4 7 8M15 16h5v-5",
   loan: "M4 11l8-7 8 7M6 10v10h12V10M10 20v-6h4v6",
   overpay: "M13 3L5 14h6l-1 7 8-11h-6l1-7z",
 };
@@ -63,6 +65,23 @@ function compoundResult({ initial, monthly, rate, years, perYear, tax }) {
   const gain = balance - paid;
   const taxAmount = tax ? gain * BELKA_TAX : 0;
   return { paid, gain, taxAmount, netGain: gain - taxAmount, final: balance - taxAmount, points };
+}
+
+// Wartość realna to kwota na koncie wyrażona w dzisiejszych cenach.
+function inflationResult({ amount, inflation, rate, years }) {
+  const growth = (year) => (1 + rate / 100) ** year;
+  const prices = (year) => (1 + inflation / 100) ** year;
+  const whole = Math.ceil(years);
+  const labels = Array.from({ length: whole + 1 }, (_, i) => Math.min(i, years));
+  return {
+    nominal: amount * growth(years),
+    real: (amount * growth(years)) / prices(years),
+    needed: amount * prices(years),
+    pricesUp: (prices(years) - 1) * 100,
+    labels,
+    nominals: labels.map((year) => amount * growth(year)),
+    reals: labels.map((year) => (amount * growth(year)) / prices(year)),
+  };
 }
 
 function loanSchedule({ amount, rate, years, type }) {
@@ -465,6 +484,54 @@ function updateCompound() {
   drawCalcChart({ stacked: true, series, labels: result.points.map((p) => p.year), title: headline });
 }
 
+// --- Inflacja ---
+
+function updateInflation() {
+  const values = calcState.inflation;
+  if (values.amount <= 0) return showCalcNeedsAmount("calc.inflation.needAmount");
+  const result = inflationResult(values);
+  const change = (result.real / values.amount - 1) * 100;
+  const percent = calcNumber(Math.abs(change), 1);
+  const nominal = moneyWhole(result.nominal);
+  let sentence = t("calc.inflation.same");
+  if (Math.abs(change) >= 0.05 && change < 0) sentence = t(values.rate > 0 ? "calc.inflation.lossWithRate" : "calc.inflation.loss", { percent, nominal });
+  if (Math.abs(change) >= 0.05 && change > 0) sentence = t("calc.inflation.gainWithRate", { percent, nominal });
+  setCalcHero(
+    t("calc.inflation.hero", { after: afterYearsText(values.years), amount: moneyWhole(values.amount) }),
+    calcNumber(Math.round(result.real)),
+    sentence,
+  );
+
+  const difference = result.real - values.amount;
+  const rows = [[t("calc.inflation.today"), moneyWhole(values.amount)]];
+  if (values.rate > 0) rows.push([t("calc.inflation.onAccount"), nominal]);
+  rows.push(
+    [t("calc.inflation.pricesUp"), `+${calcNumber(result.pricesUp, 1)}%`],
+    [t("calc.inflation.difference"), `${difference < 0 ? "−" : "+"}${moneyWhole(Math.abs(difference))}`],
+    [t("calc.inflation.real"), moneyWhole(result.real), true],
+  );
+  const meter = result.real < values.amount ? calcMeter([
+    { value: result.real, label: t("calc.inflation.kept"), className: "key-income" },
+    { value: values.amount - result.real, label: t("calc.inflation.lost"), className: "key-expense" },
+  ]) : [];
+
+  const series = [
+    { label: t("calc.inflation.onAccount"), values: result.nominals, line: "chart-line-muted", marker: "chart-marker-muted", key: "key-line-muted" },
+    { label: t("calc.inflation.real"), values: result.reals, line: "chart-line-expense", area: "calc-area-violet", marker: "chart-marker-expense", key: "key-line-expense" },
+  ];
+  const headline = t("calc.inflation.needed", { needed: moneyWhole(result.needed) });
+  $("calc-details").replaceChildren(
+    calcCard(...meter, calcRows(rows)),
+    calcCard(
+      ...chartBlock(t("calc.inflation.chart"), headline, series),
+      calcTable("inflation", t("calc.yearByYear"), [t("calc.yearHead"), t("calc.inflation.onAccount"), t("calc.inflation.real")], result.labels.slice(1).map((year, index) => [
+        calcNumber(year, 1), calcNumber(Math.round(result.nominals[index + 1])), calcNumber(Math.round(result.reals[index + 1])),
+      ])),
+    ),
+  );
+  drawCalcChart({ stacked: false, series, labels: result.labels, title: headline });
+}
+
 // --- Rata kredytu ---
 
 function updateLoan() {
@@ -588,8 +655,8 @@ function updateOverpay() {
   drawCalcChart({ stacked: false, series, labels, title: sentence });
 }
 
-function showCalcNeedsAmount() {
-  setCalcHero(t("calc.needAmountLabel"), "0", t("calc.needAmount"));
+function showCalcNeedsAmount(message = "calc.needAmount") {
+  setCalcHero(t("calc.needAmountLabel"), "0", t(message));
   $("calc-details").replaceChildren();
   $("calc-choices").replaceChildren();
 }
@@ -613,6 +680,18 @@ function calcScreens() {
           { value: 1, label: "calc.compound.yearlyCap" },
         ]),
         switchRow("compound", "tax", "calc.compound.taxSwitch", "calc.compound.taxHint"),
+      ],
+    },
+    inflation: {
+      title: "calc.inflation.title",
+      question: "calc.inflation.question",
+      note: "calc.inflation.note",
+      update: updateInflation,
+      controls: () => [
+        fieldRow("inflation", { key: "amount", label: "calc.inflation.amount", unit: "PLN", stops: STOPS_SAVINGS, limit: AMOUNT_LIMIT }),
+        fieldRow("inflation", { key: "inflation", label: "calc.inflation.rateLabel", unit: "%", stops: [0, 20], step: 0.05, limit: CALC_MAX_RATE }),
+        fieldRow("inflation", { key: "years", label: "calc.compound.years", unit: "years", stops: [1, 50], step: 1, limit: 80 }),
+        fieldRow("inflation", { key: "rate", label: "calc.inflation.savingsRate", unit: "%", stops: [0, 20], step: 0.05, limit: CALC_MAX_RATE }),
       ],
     },
     loan: {
