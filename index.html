@@ -149,7 +149,6 @@
             <span class="currency">PLN</span>
           </div>
           <p id="balance-note" class="balance-note"></p>
-          <p id="balance-free" class="balance-free" hidden></p>
           <!-- Morski pasek to zarobki, plazmowa część to wydatki, a złota to wpłaty -->
           <div id="balance-bar" class="balance-bar" aria-hidden="true"><span id="balance-fill"></span><span id="balance-saved"></span></div>
         </div>
@@ -234,21 +233,6 @@
     <div id="period-grid" class="period-grid"></div>
   </div>
 
-  <!-- Start skarbonek -->
-  <div id="budget-backdrop" class="backdrop" hidden></div>
-  <form id="budget-sheet" class="sheet" data-mode="savings" novalidate hidden>
-    <h2 class="sheet-title" data-i18n="pots.startTitle"></h2>
-    <p class="sheet-text" data-i18n="pots.startText"></p>
-    <div class="amount-line pot-amount-line">
-      <span id="budget-amount-sizer" class="amount-sizer" data-value="0,00">
-        <input id="budget-amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
-      </span>
-      <span class="currency" aria-hidden="true">PLN</span>
-    </div>
-    <p id="budget-error" class="error" role="alert" hidden></p>
-    <button type="submit" class="btn-primary ready" data-i18n="pots.startSave"></button>
-  </form>
-
   <!-- Nowa skarbonka -->
   <div id="pot-new-backdrop" class="backdrop" hidden></div>
   <form id="pot-new-sheet" class="sheet edit-sheet" data-mode="savings" novalidate hidden>
@@ -301,7 +285,7 @@
       <span class="currency" aria-hidden="true">PLN</span>
     </div>
     <p id="asset-error" class="error" role="alert" hidden></p>
-    <button type="submit" class="btn-primary ready" data-i18n="pots.startSave"></button>
+    <button type="submit" class="btn-primary ready" data-i18n="save"></button>
     <button id="asset-delete" type="button" class="edit-delete" data-i18n="networth.delete" hidden></button>
   </form>
 

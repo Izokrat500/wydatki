@@ -1153,9 +1153,6 @@ function renderBalance(incomeTotal, expenseTotal, savedTotal) {
   else if (net < 0) note = t(savedTotal > 0 ? "balance.overSaved" : "balance.over", { amount: formatMoney(-net) });
   else if (incomeTotal > 0) note = t("balance.left", { percent: Math.round((net / incomeTotal) * 100) });
   $("balance-note").textContent = note;
-  const budget = budgetNumbers();
-  $("balance-free").hidden = !budget;
-  if (budget) $("balance-free").textContent = t("pots.balanceLine", { free: formatSignedMoney(budget.free), inPots: formatMoney(budget.inPots) });
 
   $("balance-bar").hidden = incomeTotal === 0;
   const base = Math.max(incomeTotal, expenseTotal + savedTotal, 1);

@@ -7,22 +7,21 @@ function formatSignedMoney(grosze) {
   return (grosze < 0 ? "−" : "") + formatMoney(Math.abs(grosze));
 }
 
-function potsBudgetSnapshot() {
-  return JSON.parse(JSON.stringify({ pots: data.pots, potTransfers: data.potTransfers, budget: data.budget }));
+function potsSnapshot() {
+  return JSON.parse(JSON.stringify({ pots: data.pots, potTransfers: data.potTransfers }));
 }
 
-function restorePotsBudget(snapshot) {
+function restorePots(snapshot) {
   data.pots = snapshot.pots;
   data.potTransfers = snapshot.potTransfers;
-  data.budget = snapshot.budget;
 }
 
 // Zmiana z zabezpieczeniem: przy błędzie zapisu wraca poprzedni stan.
 function commitPots(change, message) {
-  const before = potsBudgetSnapshot();
+  const before = potsSnapshot();
   change();
   if (!saveData()) {
-    restorePotsBudget(before);
+    restorePots(before);
     showToast(t("error.saveEntry"));
     return false;
   }
@@ -30,7 +29,7 @@ function commitPots(change, message) {
   renderPotHint();
   if (message) {
     showToast(message, () => {
-      restorePotsBudget(before);
+      restorePots(before);
       if (saveData()) {
         renderPots();
         renderPotHint();
@@ -61,35 +60,6 @@ function potSpent(pot) {
 
 function potLeft(pot) {
   return potAdded(pot) - potSpent(pot);
-}
-
-function positiveInPots() {
-  return data.pots.reduce((sum, pot) => sum + Math.max(potLeft(pot), 0), 0);
-}
-
-function potStartAmounts() {
-  return data.pots.reduce((sum, pot) => sum + pot.start, 0);
-}
-
-// Start to zdjęcie stanu z chwili zapisu: kwota wpisana przez użytkownika już uwzględnia
-// wszystko, co było wcześniej, więc liczą się tylko wpisy dodane później.
-// Wpis dodany później, ale z datą sprzed startu, też jest już w tej kwocie.
-function countsForBudget(entry) {
-  const { start, createdAt } = data.budget;
-  if (entry.date < start) return false;
-  return createdAt ? entry.id > createdAt : true; // starty zapisane przed tą zmianą nie mają createdAt
-}
-
-// Wolne = kwota ze startu + zmiany od startu - to, co od startu przybyło w skarbonkach.
-// Skarbonka na minusie to pieniądze dopłacone z głównego konta, więc liczy się jako 0.
-function budgetNumbers() {
-  if (!data.budget) return null;
-  const { opening, potsBase = 0, startsBase = 0 } = data.budget;
-  const since = (list) => list.filter(countsForBudget).reduce((sum, entry) => sum + entry.grosze, 0);
-  const flows = since(data.incomes) - since(data.transactions) - since(data.savings);
-  const inPots = positiveInPots();
-  const free = opening + flows + (potStartAmounts() - startsBase) - (inPots - potsBase);
-  return { total: free + inPots, inPots, free };
 }
 
 // --- Widok karty Net worth ---
@@ -149,41 +119,6 @@ function renderPotHint() {
     ? t("pots.hintLeft", { left: formatSignedMoney(left) })
     : t("pots.hintAfter", { after: formatSignedMoney(left - amount) });
   hint.classList.toggle("negative", amount !== null ? left - amount < 0 : left < 0);
-}
-
-// --- Start skarbonek ---
-
-function openBudgetSheet() {
-  const numbers = budgetNumbers();
-  $("budget-amount").value = numbers && numbers.free > 0 ? amountForEditing(numbers.free) : "";
-  $("budget-error").hidden = true;
-  fitAmountField($("budget-amount"), $("budget-amount-sizer"));
-  openSheet("budget-sheet", "budget-backdrop");
-}
-
-function closeBudgetSheet() {
-  closeSheet("budget-sheet", "budget-backdrop", `nav-${activeTab}`);
-}
-
-function saveBudget(event) {
-  event.preventDefault();
-  const text = $("budget-amount").value.trim();
-  const opening = text === "" || text === "0" ? 0 : parseAmount(text);
-  if (opening === null) {
-    $("budget-error").textContent = t("error.amount");
-    $("budget-error").hidden = false;
-    return;
-  }
-  closeBudgetSheet();
-  commitPots(() => {
-    data.budget = {
-      start: todayString(),
-      opening,
-      createdAt: Date.now(),
-      potsBase: positiveInPots(),
-      startsBase: potStartAmounts(),
-    };
-  });
 }
 
 // --- Nowa skarbonka ---
@@ -387,15 +322,12 @@ function deletePot() {
   if (!pot) return;
   closePotDetail();
   commitPots(() => {
-    // Stan początkowy zostaje wśród pieniędzy, więc zawartość skarbonki wraca do Wolne.
-    if (data.budget) data.budget.opening += pot.start;
     data.pots = data.pots.filter((item) => item.id !== pot.id);
     data.potTransfers = data.potTransfers.filter((transfer) => transfer.potId !== pot.id);
   }, t("pots.deleted", { name: displayName(pot.category) }));
 }
 
 function closePotSheets() {
-  closeBudgetSheet();
   closePotNewSheet();
   closeSplitSheet();
   closeAssetSheet();
@@ -444,10 +376,6 @@ function setupPots() {
   $("pots-first").addEventListener("click", openPotNewSheet);
   $("pots-new").addEventListener("click", openPotNewSheet);
   $("pots-transfer").addEventListener("click", openSplitSheet);
-
-  $("budget-backdrop").addEventListener("click", closeBudgetSheet);
-  $("budget-sheet").addEventListener("submit", saveBudget);
-  $("budget-amount").addEventListener("input", () => fitAmountField($("budget-amount"), $("budget-amount-sizer")));
 
   $("pot-new-backdrop").addEventListener("click", closePotNewSheet);
   $("pot-new-sheet").addEventListener("submit", savePotNew);
