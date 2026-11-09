@@ -24,6 +24,7 @@
         <button id="nav-odkladam" type="button" data-i18n="tab.savings"></button>
         <button id="nav-podsumowanie" type="button" data-i18n="tab.balance"></button>
         <button id="nav-wykresy" type="button" data-i18n="tab.charts"></button>
+        <button id="nav-kalkulatory" type="button" data-i18n="tab.calc"></button>
       </div>
     </nav>
 
@@ -177,6 +178,17 @@
       </section>
 
       <!-- Zakładka Wykresy -->
+      <section id="tab-kalkulatory" class="tab" hidden>
+        <div id="calc-hub">
+          <div class="calc-bar">
+            <h2 data-i18n="calc.hubTitle"></h2>
+            <button type="button" class="settings-open" data-i18n-aria="settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div id="calc-list" class="calc-list"></div>
+        </div>
+        <div id="calc-view" hidden></div>
+      </section>
+
       <section id="tab-wykresy" class="tab" hidden>
         <div class="period">
           <div class="segmented" role="group" data-i18n-aria="periodKind">
@@ -453,6 +465,7 @@
   <script src="i18n.js"></script>
   <script src="pots.js"></script>
   <script src="networth.js"></script>
+  <script src="calculators.js"></script>
   <script src="app.js"></script>
   <script src="charts.js"></script>
 </body>

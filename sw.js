@@ -1,7 +1,7 @@
 // Tryb offline: zapamiętuje pliki aplikacji w telefonie.
 // Z internetem pobiera najnowszą wersję, bez internetu używa zapamiętanej.
 
-const CACHE_NAME = "wydatki-v7";
+const CACHE_NAME = "wydatki-v8";
 const NETWORK_TIMEOUT_MS = 3000;
 const APP_FILES = [
   "./",
@@ -10,6 +10,7 @@ const APP_FILES = [
   "i18n.js",
   "pots.js",
   "networth.js",
+  "calculators.js",
   "app.js",
   "charts.js",
   "manifest.webmanifest",
@@ -41,7 +42,8 @@ async function networkFirst(request) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
   try {
-    const response = await fetch(request, { signal: controller.signal });
+    // no-cache: bez tego telefon mógłby złożyć stronę ze starych i nowych plików po aktualizacji
+    const response = await fetch(request, { signal: controller.signal, cache: "no-cache" });
     if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch {

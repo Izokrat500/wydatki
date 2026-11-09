@@ -48,6 +48,10 @@ function niceMax(value) {
 
 function formatTick(value) {
   if (value < 1000) return String(value);
+  if (value >= 1000000) {
+    const millions = String(value / 1000000);
+    return t("millions", { value: language === "pl" ? millions.replace(".", ",") : millions });
+  }
   const thousands = String(value / 1000);
   return t("thousands", { value: language === "pl" ? thousands.replace(".", ",") : thousands });
 }

@@ -249,13 +249,14 @@ function element(tag, className, text) {
 
 // --- Zakładki ---
 
-const TABS = ["wydatki", "wplywy", "odkladam", "podsumowanie", "wykresy"];
+const TABS = ["wydatki", "wplywy", "odkladam", "podsumowanie", "wykresy", "kalkulatory"];
 const ENTRY_TABS = { wydatki: "expense", wplywy: "income", odkladam: "savings" };
 
 function showTab(name) {
   $("tab-transakcje").hidden = !ENTRY_TABS[name];
   $("tab-podsumowanie").hidden = name !== "podsumowanie";
   $("tab-wykresy").hidden = name !== "wykresy";
+  $("tab-kalkulatory").hidden = name !== "kalkulatory";
   $("filter-open").hidden = name !== "podsumowanie";
   for (const tab of TABS) {
     const button = $("nav-" + tab);
@@ -271,6 +272,7 @@ function showTab(name) {
   updateSavingsView();
   if (name === "podsumowanie") renderSummary();
   if (name === "wykresy") renderCharts();
+  if (name === "kalkulatory") renderCalculators();
 }
 
 // Podświetlenie przesuwa się pod aktywną zakładkę i przyjmuje jej szerokość.
@@ -279,6 +281,7 @@ function updateTabIndicator() {
   const bar = $("tabbar-switch");
   bar.style.setProperty("--tab-x", `${button.offsetLeft}px`);
   bar.style.setProperty("--tab-width", `${button.offsetWidth}px`);
+  bar.scrollLeft = button.offsetLeft - (bar.clientWidth - button.offsetWidth) / 2; // na wąskim ekranie pasek się przewija
   requestAnimationFrame(() => bar.classList.add("animated"));
 }
 
@@ -1732,6 +1735,7 @@ function setLanguage(next) {
   renderRecent();
   renderSummary();
   if (activeTab === "wykresy") renderCharts();
+  if (activeTab === "kalkulatory") renderCalculators();
   renderSettings();
   updateTabIndicator();
 }
@@ -1967,6 +1971,7 @@ document.addEventListener("keydown", (event) => {
 applyStaticTexts();
 setupPots();
 setupNetWorth();
+setupCalculators();
 updateDateLabel();
 renderEntryTexts();
 renderCategories();
