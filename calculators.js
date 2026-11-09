@@ -17,6 +17,11 @@ const CALC_DEFAULTS = {
   inflation: { amount: 10000, inflation: 3.5, rate: 0, years: 10 },
   loan: { amount: 300000, rate: 7.5, years: 25, type: "equal" },
   overpay: { balance: 300000, rate: 7.5, installments: 300, monthly: 500, oneOff: 0, mode: "shorter" },
+  hourly: {
+    rate: 35, hours: 8, days: 20, deductions: 0, bonus: 0, leave: 0,
+    commute: 20, breaks: 0, prep: 0, overtime: 0, extraHours: 0,
+    commuteCost: 0, food: 0, otherCosts: 0,
+  },
 };
 
 const CALC_ICONS = {
@@ -24,6 +29,7 @@ const CALC_ICONS = {
   inflation: "M4 7l5 5 4-4 7 8M15 16h5v-5",
   loan: "M4 11l8-7 8 7M6 10v10h12V10M10 20v-6h4v6",
   overpay: "M13 3L5 14h6l-1 7 8-11h-6l1-7z",
+  hourly: "M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
 };
 
 let calcState = null;
@@ -130,6 +136,31 @@ function overpaySimulation(startBalance, monthlyRate, months, monthly, oneOff, m
   return { interest: interestSum, months: paidMonths, lastPayment: paidMonths ? payment : 0, paymentAfterYear, balances };
 }
 
+// Wszystko liczone na przeciętny miesiąc: pieniądze, które zostają, podzielone przez cały czas oddany pracy.
+function hourlyResult(v) {
+  const paidHours = v.hours * v.days;
+  const leaveHours = (v.leave / 12) * v.hours; // płatny urlop to pieniądze bez przepracowanych godzin
+  const earned = v.rate * (paidHours + leaveHours) + v.bonus;
+  const keep = 1 - v.deductions / 100;
+  const afterDeductions = earned * keep;
+  const costs = (v.commuteCost + v.food) * v.days + v.otherCosts;
+  const net = afterDeductions - costs;
+  const commuteHours = (2 * v.commute * v.days) / 60;
+  const otherUnpaid = ((v.breaks + v.prep + v.overtime) * v.days) / 60 + v.extraHours;
+  const totalHours = paidHours + commuteHours + otherUnpaid;
+  if (paidHours <= 0 || totalHours <= 0) return null;
+  const perPaidHour = (amount) => amount / paidHours;
+  return {
+    paidHours, commuteHours, otherUnpaid, totalHours, afterDeductions, costs, net,
+    real: net / totalHours,
+    extras: perPaidHour(earned) - v.rate,
+    deductionLoss: perPaidHour(earned - afterDeductions),
+    costLoss: perPaidHour(costs),
+    timeLoss: perPaidHour(net) - net / totalHours,
+    neededRate: ((v.rate * totalHours + costs) / keep - v.bonus) / (paidHours + leaveHours),
+  };
+}
+
 // --- Formatowanie ---
 
 function calcNumber(value, digits = 0) {
@@ -158,6 +189,11 @@ function installmentsWord(count) {
   const lastDigit = count % 10;
   const teens = count % 100 >= 12 && count % 100 <= 14;
   return Number.isInteger(count) && lastDigit >= 2 && lastDigit <= 4 && !teens ? "raty" : "rat";
+}
+
+function daysWord(days) {
+  if (language !== "pl") return days === 1 ? "day" : "days";
+  return days === 1 ? "dzień" : "dni";
 }
 
 function yearsText(years) {
@@ -206,6 +242,7 @@ function parseCalcValue(text) {
 
 function fieldUnit(field, value) {
   if (field.unit === "installments") return installmentsWord(value);
+  if (field.unit === "days") return daysWord(value);
   return field.unit === "years" ? yearsWord(value) : field.unit;
 }
 
@@ -253,6 +290,11 @@ function fieldRow(calc, field) {
   showText();
   sync();
   row.append(head, range);
+  return row;
+}
+
+function hintedField(hintKey, row) {
+  row.append(element("p", "calc-hint calc-field-hint", t(hintKey)));
   return row;
 }
 
@@ -304,6 +346,10 @@ function switchRow(calc, key, label, hintKey) {
 }
 
 // --- Części wyniku ---
+
+function moneyPerHour(pln) {
+  return `${pln < 0 ? "−" : ""}${formatNumber(Math.round(Math.abs(pln) * 100))} PLN/h`;
+}
 
 function setCalcHero(label, value, sentence, unit = "PLN") {
   const hero = $("calc-hero");
@@ -655,8 +701,65 @@ function updateOverpay() {
   drawCalcChart({ stacked: false, series, labels, title: sentence });
 }
 
-function showCalcNeedsAmount(message = "calc.needAmount") {
-  setCalcHero(t("calc.needAmountLabel"), "0", t(message));
+// --- Realna stawka godzinowa ---
+
+function updateHourly() {
+  const values = calcState.hourly;
+  const result = hourlyResult(values);
+  if (!result) return showCalcNeedsAmount("calc.hourly.need", "PLN/h");
+  const difference = result.real - values.rate;
+  const percent = values.rate > 0 ? calcNumber(Math.abs(difference / values.rate) * 100) : "0";
+  let sentence = t("calc.hourly.same", { rate: moneyPerHour(values.rate) });
+  if (difference <= -0.005) sentence = t("calc.hourly.less", { diff: moneyPerHour(-difference), percent, rate: moneyPerHour(values.rate) });
+  if (difference >= 0.005) sentence = t("calc.hourly.more", { diff: moneyPerHour(difference), percent, rate: moneyPerHour(values.rate) });
+  if (result.real < 0) sentence = t("calc.hourly.negative");
+  setCalcHero(t("calc.hourly.hero"), `${result.real < 0 ? "−" : ""}${formatNumber(Math.round(Math.abs(result.real) * 100))}`, sentence, "PLN/h");
+
+  const losses = [
+    { key: "calc.hourly.lossDeductions", value: result.deductionLoss },
+    { key: "calc.hourly.lossCosts", value: result.costLoss },
+    { key: "calc.hourly.lossTime", value: result.timeLoss },
+  ].filter((loss) => loss.value >= 0.005);
+  const biggest = losses.reduce((top, loss) => (!top || loss.value > top.value ? loss : top), null);
+  const breakdown = [[t("calc.hourly.quoted"), moneyPerHour(values.rate)]];
+  if (Math.abs(result.extras) >= 0.005) breakdown.push([t("calc.hourly.extras"), `+${moneyPerHour(result.extras)}`]);
+  for (const loss of losses) breakdown.push([t(loss.key), `−${moneyPerHour(loss.value)}`]);
+  breakdown.push([t("calc.hourly.realRow"), moneyPerHour(result.real), true]);
+
+  const yearly = result.commuteHours * 12;
+  $("calc-details").replaceChildren(
+    calcCard(
+      element("h2", "chart-question", t("calc.hourly.whatLowers")),
+      element("p", "chart-headline", biggest ? t("calc.hourly.biggest", { name: t(biggest.key).toLowerCase(), value: moneyPerHour(biggest.value) }) : t("calc.hourly.nothing")),
+      calcRows(breakdown),
+    ),
+    calcCard(
+      element("h2", "chart-question", t("calc.hourly.timeTitle")),
+      ...calcMeter([
+        { value: result.paidHours, label: t("calc.hourly.partPaid"), className: "key-income" },
+        { value: result.commuteHours, label: t("calc.hourly.partCommute"), className: "key-expense" },
+        { value: result.otherUnpaid, label: t("calc.hourly.partOther"), className: "key-savings" },
+      ]),
+      calcRows([
+        [t("calc.hourly.paidHours"), `${calcNumber(result.paidHours, 1)} h`],
+        [t("calc.hourly.totalHours"), `${calcNumber(result.totalHours, 1)} h`],
+        [t("calc.hourly.commuteYear"), `${calcNumber(yearly, 1)} h`],
+      ]),
+    ),
+    calcCard(
+      element("h2", "chart-question", t("calc.hourly.moneyTitle")),
+      calcRows([
+        [t("calc.hourly.afterDeductions"), moneyExact(result.afterDeductions)],
+        [t("calc.hourly.costs"), `${result.costs > 0 ? "−" : ""}${moneyExact(result.costs)}`],
+        [t("calc.hourly.left"), moneyExact(result.net), true],
+        [t("calc.hourly.needed", { rate: moneyPerHour(values.rate) }), moneyPerHour(result.neededRate)],
+      ]),
+    ),
+  );
+}
+
+function showCalcNeedsAmount(message = "calc.needAmount", unit = "PLN") {
+  setCalcHero(t("calc.needAmountLabel"), "0", t(message), unit);
   $("calc-details").replaceChildren();
   $("calc-choices").replaceChildren();
 }
@@ -722,6 +825,32 @@ function calcScreens() {
         fieldRow("overpay", { key: "oneOff", label: "calc.overpay.oneOff", unit: "PLN", stops: STOPS_ONE_OFF, limit: AMOUNT_LIMIT }),
       ],
     },
+    hourly: {
+      title: "calc.hourly.title",
+      question: "calc.hourly.question",
+      note: "calc.hourly.note",
+      update: updateHourly,
+      stickyHero: true, // pól jest dużo, więc wynik musi być widoczny przy każdym z nich
+      controls: () => [
+        element("h3", "calc-group", t("calc.hourly.groupPay")),
+        fieldRow("hourly", { key: "rate", label: "calc.hourly.rate", unit: "PLN", stops: [0, 20, 50, 100, 200, 500], step: 0.5, limit: 99999 }),
+        fieldRow("hourly", { key: "hours", label: "calc.hourly.hours", unit: "h", stops: [1, 16], step: 0.5, limit: 24 }),
+        fieldRow("hourly", { key: "days", label: "calc.hourly.days", unit: "days", stops: [1, 31], step: 1, limit: 31 }),
+        hintedField("calc.hourly.deductionsHint", fieldRow("hourly", { key: "deductions", label: "calc.hourly.deductions", unit: "%", stops: [0, 60], step: 1, limit: 99 })),
+        fieldRow("hourly", { key: "bonus", label: "calc.hourly.bonus", unit: "PLN", stops: STOPS_MONTHLY, limit: AMOUNT_LIMIT }),
+        hintedField("calc.hourly.leaveHint", fieldRow("hourly", { key: "leave", label: "calc.hourly.leave", unit: "days", stops: [0, 40], step: 1, limit: 60 })),
+        element("h3", "calc-group", t("calc.hourly.groupTime")),
+        hintedField("calc.hourly.commuteHint", fieldRow("hourly", { key: "commute", label: "calc.hourly.commute", unit: "min", stops: [0, 180], step: 5, limit: 480 })),
+        fieldRow("hourly", { key: "breaks", label: "calc.hourly.breaks", unit: "min", stops: [0, 120], step: 5, limit: 480 }),
+        hintedField("calc.hourly.prepHint", fieldRow("hourly", { key: "prep", label: "calc.hourly.prep", unit: "min", stops: [0, 120], step: 5, limit: 480 })),
+        fieldRow("hourly", { key: "overtime", label: "calc.hourly.overtime", unit: "min", stops: [0, 240], step: 5, limit: 720 }),
+        hintedField("calc.hourly.extraHoursHint", fieldRow("hourly", { key: "extraHours", label: "calc.hourly.extraHours", unit: "h", stops: [0, 40], step: 1, limit: 300 })),
+        element("h3", "calc-group", t("calc.hourly.groupCosts")),
+        hintedField("calc.hourly.commuteCostHint", fieldRow("hourly", { key: "commuteCost", label: "calc.hourly.commuteCost", unit: "PLN", stops: [0, 100], step: 1, limit: 9999 })),
+        hintedField("calc.hourly.foodHint", fieldRow("hourly", { key: "food", label: "calc.hourly.food", unit: "PLN", stops: [0, 100], step: 1, limit: 9999 })),
+        hintedField("calc.hourly.otherCostsHint", fieldRow("hourly", { key: "otherCosts", label: "calc.hourly.otherCosts", unit: "PLN", stops: STOPS_MONTHLY, limit: AMOUNT_LIMIT })),
+      ],
+    },
   };
 }
 
@@ -753,7 +882,7 @@ function renderCalcView() {
   const back = element("button", "calc-back", `‹ ${t("tab.calc")}`);
   back.type = "button";
   back.addEventListener("click", closeCalculator);
-  const hero = element("div", "card calc-hero");
+  const hero = element("div", screen.stickyHero ? "card calc-hero calc-hero-sticky" : "card calc-hero");
   hero.id = "calc-hero";
   hero.setAttribute("aria-live", "polite");
   const choices = element("div", "calc-choices");

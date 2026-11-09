@@ -774,6 +774,17 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 }
 .calc-hero .total-value { justify-content: center; }
 .calc-hero .total-value strong { font-size: 2.75rem; overflow-wrap: anywhere; }
+.calc-hero-sticky {
+  position: sticky;
+  top: calc(var(--tabbar-height) + env(safe-area-inset-top));
+  z-index: 4;
+  padding: 10px 14px;
+  box-shadow: 0 10px 24px rgb(0 0 0 / .75);
+}
+.calc-hero-sticky .total-value strong { font-size: 2.1rem; }
+.calc-group { margin: 6px 0 -4px; color: var(--plasma-text); font-size: .8rem; font-weight: 600; letter-spacing: .02em; }
+.calc-group:first-child { margin-top: 0; }
+.calc-field-hint { margin-top: 6px; }
 .calc-sentence { margin: 2px 0 0; color: var(--muted); font-size: .9rem; line-height: 1.4; }
 
 .calc-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
