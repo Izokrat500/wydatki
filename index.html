@@ -28,12 +28,13 @@
     </nav>
 
     <main>
-      <!-- Zakładki Wydatki, Zarobki i Odkładam: ten sam ekran, inne dane i kolor -->
+      <!-- Zakładki Wydatki, Zarobki i Net worth: ten sam ekran, inne dane i kolor -->
       <section id="tab-transakcje" class="tab">
-        <!-- Karta Odkładam: Skarbonki albo Oszczędności -->
+        <!-- Karta Net worth: Skarbonki, Oszczędności albo Net worth -->
         <div id="savings-switch" class="segmented savings-switch" role="group" hidden>
           <button id="savings-view-pots" type="button" data-i18n="pots.tab"></button>
           <button id="savings-view-entries" type="button" data-i18n="pots.savingsTab"></button>
+          <button id="savings-view-networth" type="button" data-i18n="networth.tab"></button>
         </div>
 
         <div id="pots-view" hidden>
@@ -59,6 +60,28 @@
               <span id="pots-since"></span>
               <button id="pots-change-start" type="button" class="btn-link" data-i18n="pots.changeStart"></button>
             </p>
+          </div>
+        </div>
+
+        <div id="networth-view" hidden>
+          <div id="networth-empty" class="card pots-empty">
+            <h2 data-i18n="networth.emptyTitle"></h2>
+            <p data-i18n="networth.emptyText"></p>
+            <button id="networth-first" type="button" class="btn-primary ready" data-i18n="networth.first"></button>
+          </div>
+
+          <div id="networth-main" hidden>
+            <div class="total pots-hero">
+              <span class="total-label" data-i18n="networth.tab"></span>
+              <div class="total-value">
+                <strong id="networth-total"></strong>
+                <span class="currency">PLN</span>
+              </div>
+              <p id="networth-sub" class="balance-note"></p>
+            </div>
+            <div id="networth-list"></div>
+            <button id="networth-add" type="button" class="btn-primary ready pots-action" data-i18n="networth.add"></button>
+            <p class="pots-foot" data-i18n="networth.foot"></p>
           </div>
         </div>
 
@@ -283,6 +306,29 @@
     <p class="sheet-text split-note" data-i18n="pots.splitNote"></p>
   </form>
 
+  <!-- Pozycja net worth -->
+  <div id="asset-backdrop" class="backdrop" hidden></div>
+  <form id="asset-sheet" class="sheet edit-sheet" data-mode="savings" novalidate hidden>
+    <h2 id="asset-title" class="sheet-title"></h2>
+    <div class="segmented asset-kind" role="group" data-i18n-aria="networth.typeAria">
+      <button id="asset-kind-have" type="button" data-i18n="networth.have"></button>
+      <button id="asset-kind-owe" type="button" data-i18n="networth.owe"></button>
+    </div>
+    <div id="asset-chips" class="edit-categories" role="group" data-i18n-aria="categoryAria"></div>
+    <div class="note-block pot-new-name">
+      <input id="asset-name" type="text" maxlength="30" autocomplete="off" autocapitalize="sentences" data-i18n-placeholder="networth.namePlaceholder" data-i18n-aria="name">
+    </div>
+    <div class="amount-line pot-amount-line">
+      <span id="asset-amount-sizer" class="amount-sizer" data-value="0,00">
+        <input id="asset-amount" type="text" inputmode="decimal" autocomplete="off" maxlength="12" data-i18n-placeholder="amountPlaceholder" data-i18n-aria="amountAria">
+      </span>
+      <span class="currency" aria-hidden="true">PLN</span>
+    </div>
+    <p id="asset-error" class="error" role="alert" hidden></p>
+    <button type="submit" class="btn-primary ready" data-i18n="pots.startSave"></button>
+    <button id="asset-delete" type="button" class="edit-delete" data-i18n="networth.delete" hidden></button>
+  </form>
+
   <!-- Szczegóły skarbonki -->
   <div id="pot-detail-backdrop" class="backdrop" hidden></div>
   <div id="pot-detail-sheet" class="sheet edit-sheet" data-mode="savings" role="dialog" aria-modal="true" aria-labelledby="pot-detail-title" hidden>
@@ -446,6 +492,7 @@
 
   <script src="i18n.js"></script>
   <script src="pots.js"></script>
+  <script src="networth.js"></script>
   <script src="app.js"></script>
   <script src="charts.js"></script>
 </body>

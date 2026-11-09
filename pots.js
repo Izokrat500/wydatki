@@ -1,6 +1,6 @@
 // --- Skarbonki: pieniądze przydzielone do kategorii; przydział nie zmienia Bilansu ---
 
-let savingsView = "pots"; // co pokazuje karta Odkładam: "pots" albo "entries"
+let savingsView = "pots"; // co pokazuje karta Net worth: "pots", "entries" albo "networth"
 let openPotId = null; // skarbonka otwarta w panelu szczegółów
 
 function formatSignedMoney(grosze) {
@@ -92,16 +92,19 @@ function budgetNumbers() {
   return { total: free + inPots, inPots, free };
 }
 
-// --- Widok karty Odkładam ---
+// --- Widok karty Net worth ---
 
 function updateSavingsView() {
   const isSavingsTab = entryKind === "savings" && activeTab === "odkladam";
   const showPots = isSavingsTab && savingsView === "pots";
+  const showNetWorth = isSavingsTab && savingsView === "networth";
   $("savings-switch").hidden = !isSavingsTab;
   $("pots-view").hidden = !showPots;
-  $("entry-content").hidden = showPots;
+  $("networth-view").hidden = !showNetWorth;
+  $("entry-content").hidden = showPots || showNetWorth;
   $("savings-view-pots").setAttribute("aria-pressed", String(savingsView === "pots"));
   $("savings-view-entries").setAttribute("aria-pressed", String(savingsView === "entries"));
+  $("savings-view-networth").setAttribute("aria-pressed", String(showNetWorth));
 }
 
 function potCard(pot) {
@@ -410,6 +413,7 @@ function closePotSheets() {
   closeBudgetSheet();
   closePotNewSheet();
   closeSplitSheet();
+  closeAssetSheet();
   if (!$("pot-detail-sheet").hidden) closePotDetail();
 }
 
@@ -446,6 +450,10 @@ function setupPots() {
   });
   $("savings-view-entries").addEventListener("click", () => {
     savingsView = "entries";
+    updateSavingsView();
+  });
+  $("savings-view-networth").addEventListener("click", () => {
+    savingsView = "networth";
     updateSavingsView();
   });
   $("pots-start").addEventListener("click", openBudgetSheet);

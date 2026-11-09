@@ -733,7 +733,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tabbar button[aria-current="page"] { color: #ffffff; }
 
 /* --- Skarbonki --- */
-.savings-switch { margin: 8px 0 4px; }
+.savings-switch { margin: 8px 0 4px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.networth-heading { margin: 16px 4px 6px; color: var(--muted); font-size: .8rem; font-weight: 600; }
+.asset-kind { margin-bottom: 12px; }
+#networth-main .pots-foot { text-align: center; }
 .pots-hero { padding-top: 18px; }
 .pots-empty { margin-top: 24px; padding: 22px 18px; text-align: center; }
 .pots-empty h2 { margin: 0 0 8px; font-size: 1.2rem; }

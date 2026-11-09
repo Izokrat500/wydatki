@@ -92,6 +92,7 @@ function normalizeData(data) {
   data.pots = data.pots || [];
   data.potTransfers = data.potTransfers || [];
   data.budget = data.budget || null;
+  data.netWorth = data.netWorth || [];
   data.icons = data.icons || {};
   for (const transaction of [...data.transactions, ...data.incomes, ...data.savings]) {
     if (transaction.note) transaction.note = capitalizeFirst(transaction.note);
@@ -1016,6 +1017,7 @@ function renderSavingsOverview() {
 function renderRecent() {
   renderSavingsOverview();
   renderPots();
+  renderNetWorth();
   const list = $("recent-list");
   list.replaceChildren();
   const recent = [...ledger(entryKind).transactions].sort(sortNewestFirst).slice(0, RECENT_LIMIT);
@@ -1634,6 +1636,7 @@ function parseBackup(text) {
         : undefined,
       savings,
       ...cleanPotsFromBackup(source),
+      netWorth: cleanNetWorthFromBackup(source),
       icons: Object.fromEntries(Object.entries(icons).filter(([, icon]) => typeof icon === "string")),
     }),
   };
@@ -1966,6 +1969,7 @@ document.addEventListener("keydown", (event) => {
 
 applyStaticTexts();
 setupPots();
+setupNetWorth();
 updateDateLabel();
 renderEntryTexts();
 renderCategories();
