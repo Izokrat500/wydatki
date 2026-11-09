@@ -758,7 +758,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .pot-left { display: block; font-variant-numeric: tabular-nums; }
 .pot-of { display: block; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .pot-track { display: block; margin-top: 10px; }
-#pots-view .where-fill, .split-track .where-fill { background: var(--plasma); animation: none; transition: width .25s ease-out; }
+#pots-view .where-fill { background: var(--plasma); animation: none; transition: width .25s ease-out; }
 .pots-action { display: block; width: 100%; margin-top: 8px; }
 .pots-foot {
   display: flex;
@@ -769,7 +769,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   color: var(--muted);
   font-size: .8rem;
 }
-.pots-foot .btn-link { font-size: .8rem; }
 .balance-free { margin: -6px 0 12px; color: var(--muted); font-size: .82rem; }
 .pot-hint { margin: 0; color: var(--plasma-text); font-size: .85rem; font-weight: 500; text-align: center; }
 .sheet-text { margin: 0 4px 14px; color: var(--muted); font-size: .85rem; line-height: 1.45; text-align: center; }
@@ -780,7 +779,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .pot-has-money { display: block; width: 100%; margin-bottom: 8px; font-size: .85rem; font-weight: 500; }
 .split-head { text-align: center; }
 .split-head .total-value strong { font-size: 2.4rem; font-weight: 300; font-variant-numeric: tabular-nums; }
-.split-track { margin: 10px 0 8px; }
 .split-rows { max-height: 38dvh; overflow-y: auto; overscroll-behavior: contain; }
 .split-row {
   display: flex;
@@ -816,14 +814,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .split-input::placeholder { color: var(--faint); }
 .split-field:focus-within { box-shadow: 0 0 0 1px var(--plasma-violet); }
 .split-currency { color: var(--faint); font-size: .72rem; font-weight: 600; }
-.split-after {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 0 14px;
-  border-top: 1px solid var(--line);
-  font-size: .92rem;
-}
-.split-after span { color: var(--muted); }
 .split-note { margin: 10px 4px 0; }
 .pot-detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .pot-history { max-height: 22dvh; overflow-y: auto; overscroll-behavior: contain; }

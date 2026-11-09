@@ -127,21 +127,13 @@ function potCard(pot) {
 }
 
 function renderPots() {
-  const numbers = budgetNumbers();
-  $("pots-empty").hidden = Boolean(numbers);
-  $("pots-main").hidden = !numbers;
-  if (!numbers) return;
-
-  $("pots-free").textContent = (numbers.free < 0 ? "−" : "") + formatNumber(Math.abs(numbers.free));
-  $("pots-free").classList.toggle("negative", numbers.free < 0);
-  $("pots-sub").textContent = t("pots.sub", { inPots: formatMoney(numbers.inPots), total: formatSignedMoney(numbers.total) });
-  $("pots-since").textContent = t("pots.since", { date: formatDate(data.budget.start) });
+  const hasPots = data.pots.length > 0;
+  $("pots-empty").hidden = hasPots;
+  $("pots-main").hidden = !hasPots;
 
   const list = $("pots-list");
   list.replaceChildren();
-  if (data.pots.length === 0) list.append(element("p", "empty", t("pots.none")));
   for (const pot of data.pots) list.append(potCard(pot));
-  $("pots-transfer").hidden = data.pots.length === 0;
   if (openPotId !== null && !$("pot-detail-sheet").hidden) renderPotDetail();
 }
 
@@ -272,7 +264,7 @@ function openSplitSheet() {
     input.setAttribute("aria-label", displayName(pot.category));
     input.addEventListener("input", () => {
       input.value = input.value.replace(/[^\d.,]/g, "");
-      renderSplitSummary();
+      updateSplitSave();
     });
     const field = element("span", "split-field");
     field.append(input, element("span", "split-currency", "PLN"));
@@ -281,7 +273,7 @@ function openSplitSheet() {
     box.append(row);
   }
   $("split-error").hidden = true;
-  renderSplitSummary();
+  updateSplitSave();
   openSheet("split-sheet", "split-backdrop");
 }
 
@@ -297,15 +289,8 @@ function splitAmounts() {
   }));
 }
 
-function renderSplitSummary() {
-  const { free } = budgetNumbers();
-  const sum = splitAmounts().reduce((total, row) => total + (row.grosze || 0), 0);
-  const after = free - sum;
-  $("split-free").textContent = (free < 0 ? "−" : "") + formatNumber(Math.abs(free));
-  $("split-after").textContent = formatSignedMoney(after);
-  $("split-after").classList.toggle("negative", after < 0);
-  $("split-fill").style.width = `${free > 0 ? Math.min(100, (sum / free) * 100) : 0}%`;
-  $("split-save").classList.toggle("ready", sum > 0);
+function updateSplitSave() {
+  $("split-save").classList.toggle("ready", splitAmounts().some((row) => row.grosze !== null));
 }
 
 function saveSplit(event) {
@@ -403,7 +388,7 @@ function deletePot() {
   closePotDetail();
   commitPots(() => {
     // Stan początkowy zostaje wśród pieniędzy, więc zawartość skarbonki wraca do Wolne.
-    data.budget.opening += pot.start;
+    if (data.budget) data.budget.opening += pot.start;
     data.pots = data.pots.filter((item) => item.id !== pot.id);
     data.potTransfers = data.potTransfers.filter((transfer) => transfer.potId !== pot.id);
   }, t("pots.deleted", { name: displayName(pot.category) }));
@@ -456,8 +441,7 @@ function setupPots() {
     savingsView = "networth";
     updateSavingsView();
   });
-  $("pots-start").addEventListener("click", openBudgetSheet);
-  $("pots-change-start").addEventListener("click", openBudgetSheet);
+  $("pots-first").addEventListener("click", openPotNewSheet);
   $("pots-new").addEventListener("click", openPotNewSheet);
   $("pots-transfer").addEventListener("click", openSplitSheet);
 

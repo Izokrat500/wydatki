@@ -41,25 +41,13 @@
           <div id="pots-empty" class="card pots-empty">
             <h2 data-i18n="pots.emptyTitle"></h2>
             <p data-i18n="pots.emptyText"></p>
-            <button id="pots-start" type="button" class="btn-primary ready" data-i18n="pots.start"></button>
+            <button id="pots-first" type="button" class="btn-primary ready" data-i18n="pots.new"></button>
           </div>
 
           <div id="pots-main" hidden>
-            <div class="total pots-hero">
-              <span class="total-label" data-i18n="pots.free"></span>
-              <div class="total-value">
-                <strong id="pots-free"></strong>
-                <span class="currency">PLN</span>
-              </div>
-              <p id="pots-sub" class="balance-note"></p>
-            </div>
             <div id="pots-list"></div>
             <button id="pots-transfer" type="button" class="btn-primary ready pots-action" data-i18n="pots.transfer"></button>
             <button id="pots-new" type="button" class="btn-ghost pots-action" data-i18n="pots.new"></button>
-            <p class="pots-foot">
-              <span id="pots-since"></span>
-              <button id="pots-change-start" type="button" class="btn-link" data-i18n="pots.changeStart"></button>
-            </p>
           </div>
         </div>
 
@@ -288,19 +276,7 @@
   <div id="split-backdrop" class="backdrop" hidden></div>
   <form id="split-sheet" class="sheet edit-sheet" data-mode="savings" novalidate hidden>
     <h2 class="sheet-title" data-i18n="pots.transfer"></h2>
-    <div class="split-head">
-      <span class="total-label" data-i18n="pots.free"></span>
-      <div class="total-value">
-        <strong id="split-free"></strong>
-        <span class="currency">PLN</span>
-      </div>
-    </div>
-    <div class="where-track split-track"><span id="split-fill" class="where-fill"></span></div>
     <div id="split-rows" class="split-rows"></div>
-    <div class="split-after">
-      <span data-i18n="pots.afterSplit"></span>
-      <strong id="split-after"></strong>
-    </div>
     <p id="split-error" class="error" role="alert" hidden></p>
     <button id="split-save" type="submit" class="btn-primary" data-i18n="save"></button>
     <p class="sheet-text split-note" data-i18n="pots.splitNote"></p>
