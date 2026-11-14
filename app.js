@@ -144,6 +144,7 @@ let activeTab = "wydatki";
 let entryKind = "expense"; // co dodajemy na ekranie: wydatek albo wpływ
 let selectedCategory = null;
 const drafts = { expense: null, income: null, savings: null }; // niedokończony wpis każdej zakładki
+let savingsWithdrawal = false; // karta Oszczędności: wpłata albo wypłata
 let newCategoryIcon = null;
 let newCategoryIconPicked = false;
 let selectedDate = dateToString(now);
@@ -199,7 +200,7 @@ function formatNumber(grosze) {
 }
 
 function formatMoney(grosze) {
-  return formatNumber(grosze) + " PLN";
+  return (grosze < 0 ? "−" : "") + formatNumber(Math.abs(grosze)) + " PLN";
 }
 
 // Format "2 Lis 2026"
@@ -236,8 +237,17 @@ function sortNewestFirst(a, b) {
   return b.date.localeCompare(a.date) || b.id - a.id;
 }
 
+// Wypłata z oszczędności zmniejsza sumę, więc wszystkie salda i Bilans liczą się same.
+function entryAmount(entry) {
+  return entry.withdrawal ? -entry.grosze : entry.grosze;
+}
+
 function sumOf(transactions) {
-  return transactions.reduce((sum, t) => sum + t.grosze, 0);
+  return transactions.reduce((sum, t) => sum + entryAmount(t), 0);
+}
+
+function savingsBalance(category) {
+  return sumOf(data.savings.filter((entry) => entry.category === category));
 }
 
 function element(tag, className, text) {
@@ -262,7 +272,10 @@ function activeNavId() {
 }
 
 function showTab(name) {
-  if (name === "odkladam" && activeTab !== "odkladam") savingsView = "entries"; // po wejściu zawsze najpierw Wpłaty
+  if (name === "odkladam" && activeTab !== "odkladam") {
+    savingsView = "entries"; // po wejściu zawsze najpierw Wpłaty
+    if (savingsWithdrawal) setSavingsWithdrawal(false);
+  }
   $("tab-transakcje").hidden = !ENTRY_TABS[name];
   $("tab-podsumowanie").hidden = name !== "podsumowanie";
   $("tab-wykresy").hidden = name !== "wykresy";
@@ -319,9 +332,46 @@ function setEntryKind(kind) {
   section.classList.add("tab");
 }
 
+// Przy wypłacie z oszczędności podpowiedzi mówią o wypłacaniu, a nie odkładaniu.
+function entryText(key) {
+  const withdrawalKeys = { categoryPlaceholder: "savings.fromPlaceholder", pickCategory: "savings.fromPick", notePlaceholder: "savings.withdrawNote" };
+  return entryKind === "savings" && savingsWithdrawal ? t(withdrawalKeys[key]) : kindText(entryKind)[key];
+}
+
+function renderSavingsDirection() {
+  $("savings-direction").hidden = entryKind !== "savings";
+  $("savings-deposit").setAttribute("aria-pressed", String(!savingsWithdrawal));
+  $("savings-withdraw").setAttribute("aria-pressed", String(savingsWithdrawal));
+}
+
+function setSavingsWithdrawal(value) {
+  savingsWithdrawal = value;
+  renderEntryTexts();
+  renderCategories();
+}
+
+// Pod kwotą widać stan konta oszczędnościowego i przycisk wypłaty całości.
+function renderWithdrawHint(hint) {
+  const active = entryKind === "savings" && savingsWithdrawal && selectedCategory;
+  const button = $("withdraw-all");
+  button.hidden = true;
+  if (!active) return false;
+  const balance = savingsBalance(selectedCategory);
+  const amount = parseAmount($("amount").value);
+  hint.hidden = false;
+  hint.textContent = amount === null
+    ? t("savings.balanceHint", { balance: formatMoney(balance) })
+    : t("savings.afterHint", { after: formatMoney(balance - amount) });
+  hint.classList.toggle("negative", amount !== null && balance - amount < 0);
+  button.hidden = balance <= 0 || amount === balance;
+  button.textContent = t("savings.withdrawAll", { amount: formatMoney(balance) });
+  return true;
+}
+
 function renderEntryTexts() {
   const text = kindText(entryKind);
-  $("note").placeholder = text.notePlaceholder;
+  renderSavingsDirection();
+  $("note").placeholder = entryText("notePlaceholder");
   $("category-new").textContent = text.newCategory;
   $("recent-title").textContent = text.recent;
 }
@@ -329,7 +379,7 @@ function renderEntryTexts() {
 // --- Ekran dodawania ---
 
 function renderCategories() {
-  $("category-value").textContent = selectedCategory ? displayName(selectedCategory) : kindText(entryKind).categoryPlaceholder;
+  $("category-value").textContent = selectedCategory ? displayName(selectedCategory) : entryText("categoryPlaceholder");
   $("category-toggle").classList.toggle("placeholder", !selectedCategory);
 
   const box = $("category-options");
@@ -930,19 +980,21 @@ function submitExpense(event) {
   setCategoryPanel(false);
   const grosze = parseAmount($("amount").value);
   if (grosze === null) return showFormError(t("error.amount"));
-  if (!selectedCategory) return showFormError(kindText(entryKind).pickCategory);
+  if (!selectedCategory) return showFormError(entryText("pickCategory"));
 
   const note = capitalizeFirst($("note").value.trim());
   const { transactions } = ledger(entryKind);
   const transaction = { id: Date.now(), grosze, category: selectedCategory, date: selectedDate };
   if (note) transaction.note = note;
+  const isWithdrawal = entryKind === "savings" && savingsWithdrawal;
+  if (isWithdrawal) transaction.withdrawal = true;
   transactions.push(transaction);
   if (!saveData()) {
     transactions.pop();
     return showFormError(t("error.saveEntry"));
   }
 
-  showSavedMessage(t("saved", { amount: formatMoney(grosze), what: note || displayName(selectedCategory) }));
+  showSavedMessage(t(isWithdrawal ? "savedWithdrawal" : "saved", { amount: formatMoney(grosze), what: note || displayName(selectedCategory) }));
   $("amount").value = "";
   $("note").value = "";
   selectedCategory = null;
@@ -980,7 +1032,11 @@ function transactionRow(transaction, showCategory, kind) {
   const row = element("button", "tx");
   row.type = "button";
   const main = element("span", "tx-main");
-  if (showCategory) {
+  if (showCategory && transaction.withdrawal) {
+    row.append(avatar(transaction.category));
+    main.append(element("span", "tx-title", transaction.note || t("withdrawal")));
+    main.append(element("span", "tx-sub", displayName(transaction.category)));
+  } else if (showCategory) {
     row.append(avatar(transaction.category));
     main.append(element("span", "tx-title", transaction.note || displayName(transaction.category)));
     if (transaction.note) main.append(element("span", "tx-sub", displayName(transaction.category)));
@@ -990,7 +1046,7 @@ function transactionRow(transaction, showCategory, kind) {
   }
 
   // Plus zostaje tylko na liście karty Zarobki; w Bilansie kwoty są bez znaku.
-  const amountText = (kind === "income" && showCategory ? "+" : "") + formatMoney(transaction.grosze);
+  const amountText = (kind === "income" && showCategory ? "+" : "") + formatMoney(entryAmount(transaction));
   const amount = element("span", "tx-amount", amountText);
   amount.classList.toggle("income", kind === "income");
   amount.classList.toggle("savings", kind === "savings");
@@ -1000,29 +1056,32 @@ function transactionRow(transaction, showCategory, kind) {
   return row;
 }
 
+// Stan oszczędności: wpłaty minus wypłaty, także gdy wszystko zostało wypłacone.
 function renderSavingsOverview() {
-  const total = sumOf(data.savings);
   const box = $("savings-overview");
-  box.hidden = entryKind !== "savings" || total === 0;
+  box.hidden = entryKind !== "savings" || data.savings.length === 0;
   if (box.hidden) return;
-  $("savings-total").textContent = formatNumber(total);
+  const total = sumOf(data.savings);
+  $("savings-total").textContent = (total < 0 ? "−" : "") + formatNumber(Math.abs(total));
 
   const totals = new Map();
-  for (const { category, grosze } of data.savings) totals.set(category, (totals.get(category) || 0) + grosze);
+  for (const entry of data.savings) totals.set(entry.category, (totals.get(entry.category) || 0) + entryAmount(entry));
+  const positive = [...totals.values()].reduce((sum, value) => sum + Math.max(value, 0), 0);
   const places = $("savings-places");
   places.replaceChildren();
-  for (const [name, value] of [...totals.entries()].sort((a, b) => b[1] - a[1])) {
+  for (const [name, value] of [...totals.entries()].filter(([, value]) => value !== 0).sort((a, b) => b[1] - a[1])) {
+    const share = positive > 0 ? Math.max(value, 0) / positive : 0;
     const row = element("div", "where-row");
     const head = element("div", "where-head");
     head.append(
       avatar(name),
       element("span", "where-name", displayName(name)),
-      element("span", "where-percent", `${Math.round((value / total) * 100)}%`),
+      element("span", "where-percent", `${Math.round(share * 100)}%`),
       element("span", "where-value", formatMoney(value)),
     );
     const track = element("div", "where-track");
     const fill = element("span", "where-fill");
-    fill.style.width = `${Math.max(1, (value / total) * 100)}%`;
+    fill.style.width = `${Math.max(1, share * 100)}%`;
     track.append(fill);
     row.append(head, track);
     places.append(row);
@@ -1166,18 +1225,20 @@ function renderBalance(incomeTotal, expenseTotal, savedTotal) {
   let note = t("balance.empty");
   if (incomeTotal === 0 && expenseTotal + savedTotal > 0) note = t("balance.noIncome");
   else if (net < 0) note = t(savedTotal > 0 ? "balance.overSaved" : "balance.over", { amount: formatMoney(-net) });
+  else if (savedTotal < 0) note = t("balance.withdrawn", { amount: formatMoney(-savedTotal) });
   else if (incomeTotal > 0) note = t("balance.left", { percent: Math.round((net / incomeTotal) * 100) });
   $("balance-note").textContent = note;
 
   $("balance-bar").hidden = incomeTotal === 0;
   const base = Math.max(incomeTotal, expenseTotal + savedTotal, 1);
   $("balance-fill").style.width = `${(expenseTotal / base) * 100}%`;
-  $("balance-saved").style.width = `${(savedTotal / base) * 100}%`;
+  $("balance-saved").style.width = `${(Math.max(savedTotal, 0) / base) * 100}%`;
 
   // Kafelki liczą tylko kategorie zaznaczone w filtrze; bilans wyżej zawsze obejmuje wszystko.
   $("income-total").textContent = formatNumber(selectedTotal("income"));
   $("expense-total").textContent = formatNumber(selectedTotal("expense"));
-  $("savings-sum").textContent = formatNumber(selectedTotal("savings"));
+  const savedSum = selectedTotal("savings"); // po wypłatach może być ujemne
+  $("savings-sum").textContent = (savedSum < 0 ? "−" : "") + formatNumber(Math.abs(savedSum));
   for (const kind of ["income", "expense", "savings"]) {
     $(`view-${kind}`).setAttribute("aria-pressed", String(summaryView === kind));
     $(`view-${kind}`).classList.toggle("filtered", hiddenCategories[kind].size > 0);
@@ -1261,7 +1322,7 @@ function categoryCard(group, periodTotal, kind) {
     const bar = element("span", "share-bar");
     bar.style.display = "block";
     const fill = element("span");
-    fill.style.width = `${(group.total / periodTotal) * 100}%`;
+    fill.style.width = `${periodTotal > 0 ? (Math.max(group.total, 0) / periodTotal) * 100 : 0}%`;
     bar.append(fill);
     row.append(bar);
   }
@@ -1612,6 +1673,7 @@ function cleanEntries(list) {
       date: entry.date,
     };
     if (typeof entry.note === "string" && entry.note) clean.note = entry.note;
+    if (entry.withdrawal === true) clean.withdrawal = true;
     return clean;
   });
 }
@@ -1981,6 +2043,13 @@ document.addEventListener("keydown", (event) => {
     if (editing) closeEditSheet();
     closeBackupSheet();
   }
+});
+
+$("savings-deposit").addEventListener("click", () => setSavingsWithdrawal(false));
+$("savings-withdraw").addEventListener("click", () => setSavingsWithdrawal(true));
+$("withdraw-all").addEventListener("click", () => {
+  $("amount").value = amountForEditing(savingsBalance(selectedCategory));
+  updateAmountField();
 });
 
 applyStaticTexts();

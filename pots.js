@@ -110,6 +110,7 @@ function renderPots() {
 // Przy dodawaniu wydatku widać, ile zostanie w skarbonce tej kategorii.
 function renderPotHint() {
   const hint = $("pot-hint");
+  if (renderWithdrawHint(hint)) return;
   const pot = entryKind === "expense" && selectedCategory ? potFor(selectedCategory) : null;
   hint.hidden = !pot;
   if (!pot) return;

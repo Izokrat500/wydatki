@@ -88,6 +88,10 @@
           <button type="button" class="settings-open settings-open-entry" data-i18n-aria="settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
 
           <div class="entry-top">
+            <div id="savings-direction" class="segmented savings-direction" role="group" data-i18n-aria="savings.directionAria" hidden>
+              <button id="savings-deposit" type="button" data-i18n="savings.deposit"></button>
+              <button id="savings-withdraw" type="button" data-i18n="savings.withdraw"></button>
+            </div>
             <button id="date-toggle" type="button" class="date-pill" aria-haspopup="dialog">
               <span id="date-value"></span>
             </button>
@@ -118,6 +122,7 @@
               <input id="note" type="text" maxlength="40" autocomplete="off" autocapitalize="sentences" data-i18n-aria="noteAria">
               <div id="note-suggestions" class="note-suggestions"></div>
               <p id="pot-hint" class="pot-hint" hidden></p>
+              <button id="withdraw-all" type="button" class="btn-link withdraw-all" hidden></button>
             </div>
 
             <button id="save-button" type="submit" class="btn-primary" data-i18n="save"></button>

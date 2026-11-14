@@ -167,7 +167,7 @@ function renderFlowChart() {
   const total = (field) => months.reduce((sum, m) => sum + m[field], 0);
   const totalBalance = total("income") - total("expense") - total("savings");
   const hasData = total("income") + total("expense") + total("savings") > 0;
-  const hasSavings = total("savings") > 0;
+  const hasSavings = months.some((m) => m.savings > 0); // miesiąc z samymi wypłatami nie ma słupka
   const balanceText = signedMoney(totalBalance);
   $("flow-headline").textContent = !hasData
     ? t("chart.flowEmpty")

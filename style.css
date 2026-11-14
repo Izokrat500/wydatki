@@ -118,7 +118,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   min-height: calc(100dvh - var(--tabbar-height) - 104px - env(safe-area-inset-top));
 }
 
-.entry-top { display: flex; align-items: flex-end; justify-content: center; }
+.entry-top { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 14px; }
+.savings-direction { width: min(240px, 100%); }
+.withdraw-all { justify-self: center; font-size: .85rem; font-weight: 500; }
 
 /* Przycisk ustawień: świecąca kropka, gdy potrzebna jest kopia danych */
 .settings-open {
